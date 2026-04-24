@@ -13,6 +13,7 @@ import AddExpenseScreen from './src/screens/AddExpenseScreen';
 import SignupScreen from './src/screens/SignupScreen';
 import CreateGroupScreen from './src/screens/CreateGroupScreen';
 import GroupDetailScreen from './src/screens/GroupDetailScreen';
+import GroupAddExpenseScreen from './src/screens/GroupAddExpenseScreen';
 import { colors } from './src/theme/colors';
 import { useAuth } from './src/store/useAuth';
 import React, { useEffect } from 'react';
@@ -104,6 +105,7 @@ export default function App() {
             <Stack.Screen name="AddExpense" component={AddExpenseScreen} options={{ presentation: 'modal' }} />
             <Stack.Screen name="CreateGroup" component={CreateGroupScreen} options={{ presentation: 'modal' }} />
             <Stack.Screen name="GroupDetail" component={GroupDetailScreen} />
+            <Stack.Screen name="GroupAddExpense" component={GroupAddExpenseScreen} options={{ presentation: 'modal', headerShown: false }} />
           </>
         ) : (
           <>

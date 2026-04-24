@@ -28,7 +28,9 @@ export default function CreateGroupScreen({ navigation }) {
     setIsLoading(true);
     try {
       const { data } = await api.post('/groups', {
-        name: `${selectedType.icon} ${name.trim()}`,
+        name: name.trim(),
+        type: selectedType.id,
+        icon: selectedType.icon,
       });
       navigation.replace('GroupDetail', { groupId: data.id, groupName: data.name });
     } catch (err) {

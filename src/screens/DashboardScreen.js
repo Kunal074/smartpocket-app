@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Platform, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Platform, Dimensions, ActivityIndicator, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Plus, Users, MessageSquare, Globe, RefreshCw, User, ChevronRight, Wallet } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -62,6 +62,17 @@ export default function DashboardScreen({ navigation }) {
   const youGet = 0; // We will fetch this from settlements later
   const firstName = user?.name?.split(' ')[0] || 'there';
 
+  const handleProfilePress = () => {
+    Alert.alert(
+      "Profile",
+      "Do you want to log out?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Log Out", style: "destructive", onPress: logout }
+      ]
+    );
+  };
+
   return (
     <View style={styles.container}>
       {/* Background Gradient for top half */}
@@ -78,10 +89,10 @@ export default function DashboardScreen({ navigation }) {
         {/* Header / Greeting */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Good evening 👋</Text>
+            <Text style={styles.greeting}>Good evening \uD83D\uDC4B</Text>
             <Text style={styles.name}>{firstName}</Text>
           </View>
-          <TouchableOpacity style={styles.profileBtn} onPress={logout}>
+          <TouchableOpacity style={styles.profileBtn} onPress={handleProfilePress}>
             <User color={colors.primary} size={20} />
           </TouchableOpacity>
         </View>
