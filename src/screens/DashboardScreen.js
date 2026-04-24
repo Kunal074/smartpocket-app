@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Platform, Dimensions } from 'react-native';
 import { Plus, Users, MessageSquare, Globe, RefreshCw, User, ChevronRight, Wallet } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../theme/colors';
 
 export default function DashboardScreen({ navigation }) {
@@ -10,8 +11,17 @@ export default function DashboardScreen({ navigation }) {
   const youGet = 0;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <View style={styles.container}>
+      {/* Background Gradient for top half */}
+      <LinearGradient
+        colors={['#E1EEFE', '#F4F8FB']}
+        style={styles.gradientBackground}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+      />
+      
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         
         {/* Header / Greeting */}
         <View style={styles.header}>
@@ -136,13 +146,22 @@ export default function DashboardScreen({ navigation }) {
 
       </ScrollView>
     </SafeAreaView>
+    </View>
   );
 }
 
+const { width, height } = Dimensions.get('window');
+
 const styles = StyleSheet.create({
+  gradientBackground: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: height * 0.45, // Gradient takes up top 45% of screen
+  },
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
     paddingTop: Platform.OS === 'android' ? 30 : 0,
   },
   container: {

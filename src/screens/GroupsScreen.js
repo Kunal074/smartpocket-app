@@ -79,7 +79,7 @@ export default function GroupsScreen({ navigation }) {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.title}>SmartSplit</Text>
+            <Text style={styles.title}>SmartPocket</Text>
             <Text style={styles.subtitle}>Split bills and manage expenses</Text>
           </View>
           <TouchableOpacity style={styles.newGroupBtn}>

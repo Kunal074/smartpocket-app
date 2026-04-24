@@ -8,7 +8,10 @@ import { Home, Users, PieChart, Receipt, User } from 'lucide-react-native';
 import DashboardScreen from './src/screens/DashboardScreen';
 import GroupsScreen from './src/screens/GroupsScreen';
 import AnalyticsScreen from './src/screens/AnalyticsScreen';
+import LoginScreen from './src/screens/LoginScreen';
 import { colors } from './src/theme/colors';
+import { useAuth } from './src/store/useAuth';
+import React, { useEffect } from 'react';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -77,11 +80,27 @@ function BottomTabs() {
 }
 
 export default function App() {
+  const { token, initAuth, isLoading } = useAuth();
+
+  useEffect(() => {
+    initAuth();
+  }, [initAuth]);
+
+  if (isLoading) {
+    return null; // A proper splash screen could go here
+  }
+
   return (
     <NavigationContainer>
       <StatusBar style="dark" backgroundColor="#F4F8FB" />
       <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
-        <Stack.Screen name="MainTabs" component={BottomTabs} />
+        {token ? (
+          // Main App
+          <Stack.Screen name="MainTabs" component={BottomTabs} />
+        ) : (
+          // Auth Stack
+          <Stack.Screen name="Login" component={LoginScreen} />
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );
