@@ -6,18 +6,30 @@ import {
 import { Users, Plus, Search, ArrowRight, X, Contact as ContactIcon } from 'lucide-react-native';
 import * as Contacts from 'expo-contacts';
 import { colors } from '../theme/colors';
-
-// Placeholder Groups Data
-const DUMMY_GROUPS = [
-  { id: '1', name: 'Goa Trip 🏖️', member_count: 5, color: '#E8F0FE', icon: '✈️' },
-  { id: '2', name: 'Apartment 🏠', member_count: 3, color: '#D1FAE5', icon: '🏠' },
-];
+import { api } from '../api/client';
 
 export default function GroupsScreen({ navigation }) {
   const [search, setSearch] = useState('');
   const [showAddFriend, setShowAddFriend] = useState(false);
   const [contacts, setContacts] = useState([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
+  
+  const [groups, setGroups] = useState([]);
+  const [loadingGroups, setLoadingGroups] = useState(true);
+
+  useEffect(() => {
+    const fetchGroups = async () => {
+      try {
+        const { data } = await api.get('/groups');
+        setGroups(data);
+      } catch (error) {
+        console.error("Failed to fetch groups", error);
+      } finally {
+        setLoadingGroups(false);
+      }
+    };
+    fetchGroups();
+  }, []);
 
   const fetchContacts = async () => {
     setLoadingContacts(true);
@@ -50,28 +62,34 @@ export default function GroupsScreen({ navigation }) {
     fetchContacts();
   };
 
-  const renderGroupCard = ({ item }) => (
-    <TouchableOpacity style={styles.groupCard}>
-      <View style={styles.cardHeader}>
-        <View style={[styles.groupIconBg, { backgroundColor: item.color }]}>
-          <Text style={styles.groupIconText}>{item.icon}</Text>
+  const renderGroupCard = ({ item, index }) => {
+    // Generate dynamic colors for groups without hardcoded ones
+    const bgColors = ['#E8F0FE', '#D1FAE5', '#FEF3C7', '#EDE9FE'];
+    const bgColor = bgColors[index % bgColors.length];
+    
+    return (
+      <TouchableOpacity style={styles.groupCard}>
+        <View style={styles.cardHeader}>
+          <View style={[styles.groupIconBg, { backgroundColor: bgColor }]}>
+            <Text style={styles.groupIconText}>👥</Text>
+          </View>
+          <View style={styles.arrowBg}>
+            <ArrowRight color={colors.primary} size={16} />
+          </View>
         </View>
-        <View style={styles.arrowBg}>
-          <ArrowRight color={colors.primary} size={16} />
+        
+        <Text style={styles.groupName}>{item.name}</Text>
+        
+        <View style={styles.cardFooter}>
+          <View style={styles.memberBadge}>
+            <Users color={colors.textSecondary} size={12} />
+            <Text style={styles.memberCount}>Members</Text>
+          </View>
+          <Text style={styles.viewText}>View →</Text>
         </View>
-      </View>
-      
-      <Text style={styles.groupName}>{item.name}</Text>
-      
-      <View style={styles.cardFooter}>
-        <View style={styles.memberBadge}>
-          <Users color={colors.textSecondary} size={12} />
-          <Text style={styles.memberCount}>{item.member_count} members</Text>
-        </View>
-        <Text style={styles.viewText}>View →</Text>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -113,13 +131,18 @@ export default function GroupsScreen({ navigation }) {
 
         {/* Groups Grid */}
         <FlatList
-          data={DUMMY_GROUPS}
-          keyExtractor={item => item.id}
+          data={groups.filter(g => g.name.toLowerCase().includes(search.toLowerCase()))}
+          keyExtractor={item => item.id.toString()}
           renderItem={renderGroupCard}
           numColumns={2}
           columnWrapperStyle={styles.row}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+             <View style={{ alignItems: 'center', marginTop: 40 }}>
+                <Text style={{ color: colors.textMuted }}>No groups found</Text>
+             </View>
+          }
         />
       </View>
 

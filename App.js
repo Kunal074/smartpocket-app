@@ -9,6 +9,7 @@ import DashboardScreen from './src/screens/DashboardScreen';
 import GroupsScreen from './src/screens/GroupsScreen';
 import AnalyticsScreen from './src/screens/AnalyticsScreen';
 import LoginScreen from './src/screens/LoginScreen';
+import AddExpenseScreen from './src/screens/AddExpenseScreen';
 import { colors } from './src/theme/colors';
 import { useAuth } from './src/store/useAuth';
 import React, { useEffect } from 'react';
@@ -96,7 +97,14 @@ export default function App() {
       <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
         {token ? (
           // Main App
-          <Stack.Screen name="MainTabs" component={BottomTabs} />
+          <>
+            <Stack.Screen name="MainTabs" component={BottomTabs} />
+            <Stack.Screen 
+              name="AddExpense" 
+              component={AddExpenseScreen} 
+              options={{ presentation: 'modal' }} 
+            />
+          </>
         ) : (
           // Auth Stack
           <Stack.Screen name="Login" component={LoginScreen} />

@@ -27,18 +27,19 @@ export const useAuth = create((set) => ({
   login: async (email, password) => {
     set({ isLoading: true, error: null });
     try {
-      // Mocking the API for now until we link the local IP
-      // const res = await api.post('/auth/login', { email, password });
+      // Connect to the real PERN backend!
+      const res = await api.post('/auth/login', { email, password });
       
-      // MOCK SUCCESS
-      const mockToken = 'mock_jwt_token_12345';
-      const mockUser = { id: 1, name: 'Kunal', email };
+      const realToken = res.data.token;
+      const realUser = res.data.user;
       
-      await AsyncStorage.setItem('auth_token', mockToken);
-      set({ user: mockUser, token: mockToken, isLoading: false });
+      await AsyncStorage.setItem('auth_token', realToken);
+      set({ user: realUser, token: realToken, isLoading: false });
       return true;
     } catch (err) {
-      set({ error: err.message || 'Login failed', isLoading: false });
+      // Axios error handling
+      const message = err.response?.data?.error || err.message || 'Login failed';
+      set({ error: message, isLoading: false });
       return false;
     }
   },

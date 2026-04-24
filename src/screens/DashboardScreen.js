@@ -1,14 +1,64 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Platform, Dimensions } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Platform, Dimensions, ActivityIndicator } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Plus, Users, MessageSquare, Globe, RefreshCw, User, ChevronRight, Wallet } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../theme/colors';
+import { api } from '../api/client';
+import { useAuth } from '../store/useAuth';
 
 export default function DashboardScreen({ navigation }) {
-  // Placeholder data - we'll hook this up to the backend later
-  const todaySpend = 720;
-  const monthSpend = 34580;
-  const youGet = 0;
+  const { user, logout } = useAuth();
+  const [expenses, setExpenses] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      const fetchExpenses = async () => {
+        try {
+          const { data } = await api.get('/expenses');
+          if (isActive) {
+            setExpenses(Array.isArray(data) ? data : (data.expenses ?? []));
+          }
+        } catch (error) {
+          if (error.response?.status === 401 && isActive) {
+            logout();
+          } else if (isActive) {
+            console.warn("Failed to fetch expenses:", error.message);
+          }
+        } finally {
+          if (isActive) setIsLoading(false);
+        }
+      };
+
+      fetchExpenses();
+
+      return () => {
+        isActive = false;
+      };
+    }, [logout])
+  );
+
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const month = now.toISOString().slice(0, 7);
+
+  const todaySpend = expenses
+    .filter(e => e.date?.slice(0, 10) === today)
+    .reduce((s, e) => s + parseFloat(e.amount || 0), 0);
+
+  const monthSpend = expenses
+    .filter(e => e.date?.slice(0, 7) === month)
+    .reduce((s, e) => s + parseFloat(e.amount || 0), 0);
+
+  const recent = [...expenses]
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 5);
+
+  const youGet = 0; // We will fetch this from settlements later
+  const firstName = user?.name?.split(' ')[0] || 'there';
 
   return (
     <View style={styles.container}>
@@ -27,9 +77,9 @@ export default function DashboardScreen({ navigation }) {
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>Good evening 👋</Text>
-            <Text style={styles.name}>there</Text>
+            <Text style={styles.name}>{firstName}</Text>
           </View>
-          <TouchableOpacity style={styles.profileBtn}>
+          <TouchableOpacity style={styles.profileBtn} onPress={logout}>
             <User color={colors.primary} size={20} />
           </TouchableOpacity>
         </View>
@@ -88,7 +138,10 @@ export default function DashboardScreen({ navigation }) {
             <Text style={styles.btnSecondaryText}>Create a Group</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.btnPrimary}>
+          <TouchableOpacity 
+            style={styles.btnPrimary}
+            onPress={() => navigation.navigate('AddExpense')}
+          >
             <Plus color={colors.surface} size={18} />
             <Text style={styles.btnPrimaryText}>Add Expense</Text>
           </TouchableOpacity>
@@ -135,13 +188,43 @@ export default function DashboardScreen({ navigation }) {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.emptyTransactions}>
-            <View style={styles.emptyIconBg}>
-              <Wallet color={colors.primary} size={28} />
+          {isLoading ? (
+            <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 20 }} />
+          ) : recent.length === 0 ? (
+            <View style={styles.emptyTransactions}>
+              <View style={styles.emptyIconBg}>
+                <Wallet color={colors.primary} size={28} />
+              </View>
+              <Text style={styles.emptyTitle}>No expenses yet</Text>
+              <Text style={styles.emptySubtitle}>Add your first expense to get started</Text>
             </View>
-            <Text style={styles.emptyTitle}>No expenses yet</Text>
-            <Text style={styles.emptySubtitle}>Add your first expense to get started</Text>
-          </View>
+          ) : (
+            <View style={{ gap: 12 }}>
+              {recent.map((expense) => {
+                const isToday = expense.date?.slice(0, 10) === today;
+                const expDate = new Date(expense.date);
+                
+                return (
+                  <TouchableOpacity key={expense.id} style={styles.transactionCard}>
+                    <View style={styles.transactionLeft}>
+                      <View style={styles.transactionIconBg}>
+                        <Text style={styles.transactionEmoji}>💸</Text>
+                      </View>
+                      <View>
+                        <Text style={styles.transactionTitle}>{expense.note || expense.category_id || 'Expense'}</Text>
+                        <Text style={styles.transactionDate}>
+                          {isToday ? 'Today' : expDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.transactionAmount}>
+                      −₹{parseFloat(expense.amount).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
         </View>
 
       </ScrollView>
@@ -396,5 +479,46 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textMuted,
     textAlign: 'center',
+  },
+  transactionCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  transactionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  transactionIconBg: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  transactionEmoji: {
+    fontSize: 20,
+  },
+  transactionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 4,
+  },
+  transactionDate: {
+    fontSize: 12,
+    color: colors.textMuted,
+  },
+  transactionAmount: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.danger,
   },
 });
