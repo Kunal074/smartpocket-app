@@ -1,29 +1,40 @@
 import React, { useState } from 'react';
-import { 
-  View, Text, StyleSheet, TextInput, 
-  TouchableOpacity, SafeAreaView, KeyboardAvoidingView, 
-  Platform, ActivityIndicator 
+import {
+  View, Text, StyleSheet, TextInput,
+  TouchableOpacity, SafeAreaView, KeyboardAvoidingView,
+  Platform, ActivityIndicator, ScrollView
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Mail, Lock, ArrowRight } from 'lucide-react-native';
+import { Mail, Lock, User, ArrowRight } from 'lucide-react-native';
 import { colors } from '../theme/colors';
+import { api } from '../api/client';
 import { useAuth } from '../store/useAuth';
 
-export default function LoginScreen({ navigation }) {
+export default function SignupScreen({ navigation }) {
   const { login } = useAuth();
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = async () => {
-    if (!email || !password) return;
-    
+  const handleSignup = async () => {
+    if (!name || !email || !password) {
+      alert('Please fill in all fields');
+      return;
+    }
+    if (password.length < 6) {
+      alert('Password must be at least 6 characters');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      // Calls our mock login in Zustand which sets the auth_token
+      await api.post('/auth/signup', { name, email, password });
+      // Auto login after signup
       await login(email, password);
-    } catch (error) {
-      alert("Login failed");
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message || 'Signup failed';
+      alert(msg);
     } finally {
       setIsLoading(false);
     }
@@ -37,19 +48,33 @@ export default function LoginScreen({ navigation }) {
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
       />
-      
       <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView 
+        <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardView}
         >
-          <View style={styles.content}>
+          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
             <View style={styles.header}>
-              <Text style={styles.title}>SmartPocket</Text>
-              <Text style={styles.subtitle}>Welcome back! Let's manage your finances.</Text>
+              <Text style={styles.title}>Create Account</Text>
+              <Text style={styles.subtitle}>Join SmartPocket and track expenses together.</Text>
             </View>
 
             <View style={styles.form}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Full Name</Text>
+                <View style={styles.inputContainer}>
+                  <User color={colors.textMuted} size={20} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter your name"
+                    placeholderTextColor={colors.textMuted}
+                    value={name}
+                    onChangeText={setName}
+                    autoCapitalize="words"
+                  />
+                </View>
+              </View>
+
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Email Address</Text>
                 <View style={styles.inputContainer}>
@@ -72,7 +97,7 @@ export default function LoginScreen({ navigation }) {
                   <Lock color={colors.textMuted} size={20} style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
-                    placeholder="Enter your password"
+                    placeholder="Min. 6 characters"
                     placeholderTextColor={colors.textMuted}
                     value={password}
                     onChangeText={setPassword}
@@ -81,20 +106,16 @@ export default function LoginScreen({ navigation }) {
                 </View>
               </View>
 
-              <TouchableOpacity style={styles.forgotPassword}>
-                <Text style={styles.forgotText}>Forgot password?</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.loginBtn}
-                onPress={handleLogin}
+              <TouchableOpacity
+                style={styles.signupBtn}
+                onPress={handleSignup}
                 disabled={isLoading}
               >
                 {isLoading ? (
                   <ActivityIndicator color={colors.surface} />
                 ) : (
                   <>
-                    <Text style={styles.loginBtnText}>Log In</Text>
+                    <Text style={styles.signupBtnText}>Create Account</Text>
                     <ArrowRight color={colors.surface} size={18} />
                   </>
                 )}
@@ -102,12 +123,12 @@ export default function LoginScreen({ navigation }) {
             </View>
 
             <View style={styles.footer}>
-              <Text style={styles.footerText}>Don't have an account? </Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
-                <Text style={styles.signupText}>Sign up</Text>
+              <Text style={styles.footerText}>Already have an account? </Text>
+              <TouchableOpacity onPress={() => navigation.goBack()}>
+                <Text style={styles.loginText}>Log In</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
@@ -115,44 +136,14 @@ export default function LoginScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  gradientBackground: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    height: '60%',
-  },
-  safeArea: {
-    flex: 1,
-    paddingTop: Platform.OS === 'android' ? 30 : 0,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    padding: 24,
-    justifyContent: 'center',
-  },
-  header: {
-    marginBottom: 40,
-  },
-  title: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: colors.textPrimary,
-    letterSpacing: -1,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    lineHeight: 24,
-  },
+  container: { flex: 1, backgroundColor: colors.background },
+  gradientBackground: { position: 'absolute', left: 0, right: 0, top: 0, height: '60%' },
+  safeArea: { flex: 1, paddingTop: Platform.OS === 'android' ? 30 : 0 },
+  keyboardView: { flex: 1 },
+  content: { padding: 24, flexGrow: 1, justifyContent: 'center' },
+  header: { marginBottom: 36 },
+  title: { fontSize: 34, fontWeight: '800', color: colors.textPrimary, letterSpacing: -1, marginBottom: 8 },
+  subtitle: { fontSize: 16, color: colors.textSecondary, lineHeight: 24 },
   form: {
     backgroundColor: colors.surface,
     padding: 24,
@@ -165,17 +156,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderLight,
   },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
+  inputGroup: { marginBottom: 20 },
+  label: { fontSize: 13, fontWeight: '700', color: colors.textSecondary, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -186,25 +168,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 56,
   },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: colors.textPrimary,
-    height: '100%',
-  },
-  forgotPassword: {
-    alignSelf: 'flex-end',
-    marginBottom: 24,
-  },
-  forgotText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.primary,
-  },
-  loginBtn: {
+  inputIcon: { marginRight: 12 },
+  input: { flex: 1, fontSize: 16, color: colors.textPrimary, height: '100%' },
+  signupBtn: {
     flexDirection: 'row',
     backgroundColor: colors.primary,
     height: 56,
@@ -212,25 +178,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
+    marginTop: 8,
   },
-  loginBtnText: {
-    color: colors.surface,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 32,
-  },
-  footerText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  signupText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.primary,
-  },
+  signupBtnText: { color: colors.surface, fontSize: 16, fontWeight: '700' },
+  footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 32 },
+  footerText: { fontSize: 14, color: colors.textSecondary },
+  loginText: { fontSize: 14, fontWeight: '700', color: colors.primary },
 });

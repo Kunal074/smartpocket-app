@@ -10,6 +10,9 @@ import GroupsScreen from './src/screens/GroupsScreen';
 import AnalyticsScreen from './src/screens/AnalyticsScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import AddExpenseScreen from './src/screens/AddExpenseScreen';
+import SignupScreen from './src/screens/SignupScreen';
+import CreateGroupScreen from './src/screens/CreateGroupScreen';
+import GroupDetailScreen from './src/screens/GroupDetailScreen';
 import { colors } from './src/theme/colors';
 import { useAuth } from './src/store/useAuth';
 import React, { useEffect } from 'react';
@@ -96,18 +99,17 @@ export default function App() {
       <StatusBar style="dark" backgroundColor="#F4F8FB" />
       <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
         {token ? (
-          // Main App
           <>
             <Stack.Screen name="MainTabs" component={BottomTabs} />
-            <Stack.Screen 
-              name="AddExpense" 
-              component={AddExpenseScreen} 
-              options={{ presentation: 'modal' }} 
-            />
+            <Stack.Screen name="AddExpense" component={AddExpenseScreen} options={{ presentation: 'modal' }} />
+            <Stack.Screen name="CreateGroup" component={CreateGroupScreen} options={{ presentation: 'modal' }} />
+            <Stack.Screen name="GroupDetail" component={GroupDetailScreen} />
           </>
         ) : (
-          // Auth Stack
-          <Stack.Screen name="Login" component={LoginScreen} />
+          <>
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="Signup" component={SignupScreen} />
+          </>
         )}
       </Stack.Navigator>
     </NavigationContainer>

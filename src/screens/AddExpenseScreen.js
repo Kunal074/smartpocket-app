@@ -58,7 +58,7 @@ export default function AddExpenseScreen({ navigation }) {
             <X color={colors.textPrimary} size={24} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Add Expense</Text>
-          <View style={styles.iconBtn} /> {/* Empty view for balance */}
+          <View style={styles.iconBtn} />
         </View>
 
         <View style={styles.content}>
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
     padding: 16,
     fontSize: 16,
     color: colors.textPrimary,
-    marginBottom: 'auto',
+    marginBottom: 16,
   },
   saveBtn: {
     flexDirection: 'row',

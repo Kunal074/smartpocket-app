@@ -68,7 +68,7 @@ export default function GroupsScreen({ navigation }) {
     const bgColor = bgColors[index % bgColors.length];
     
     return (
-      <TouchableOpacity style={styles.groupCard}>
+      <TouchableOpacity style={styles.groupCard} onPress={() => navigation.navigate('GroupDetail', { groupId: item.id, groupName: item.name })}>
         <View style={styles.cardHeader}>
           <View style={[styles.groupIconBg, { backgroundColor: bgColor }]}>
             <Text style={styles.groupIconText}>👥</Text>
@@ -100,7 +100,7 @@ export default function GroupsScreen({ navigation }) {
             <Text style={styles.title}>SmartPocket</Text>
             <Text style={styles.subtitle}>Split bills and manage expenses</Text>
           </View>
-          <TouchableOpacity style={styles.newGroupBtn}>
+          <TouchableOpacity style={styles.newGroupBtn} onPress={() => navigation.navigate('CreateGroup')}>
             <Plus color={colors.primary} size={20} />
           </TouchableOpacity>
         </View>
@@ -413,7 +413,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   addBtnSmall: {
-    marginLeft: 'auto',
+    marginLeft: 8,
     backgroundColor: colors.primary,
     paddingHorizontal: 16,
     paddingVertical: 8,
