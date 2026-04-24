@@ -30,26 +30,44 @@ const CATEGORIES = [
 ];
 
 export default function GroupAddExpenseScreen({ route, navigation }) {
-  const { groupId, groupName, members: initialMembers } = route.params;
+  const { groupId, groupName, members: initialMembers = [], editMode, expense, splits = [] } = route.params || {};
   const { user } = useAuth();
   
+  const isPersonal = !groupId;
+
   const [members, setMembers] = useState(initialMembers);
-  const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('other');
-  const [price, setPrice] = useState('');
-  const [paidBy, setPaidBy] = useState(user.id);
-  const [splitType, setSplitType] = useState('equal'); // equal, unequal, item
-  const [selectedMembers, setSelectedMembers] = useState(members.map(m => m.user_id));
+  const [description, setDescription] = useState(editMode ? (expense?.title || expense?.note) : '');
+  const [category, setCategory] = useState(editMode ? expense?.category : 'other');
+  const [price, setPrice] = useState(editMode ? parseFloat(expense?.amount).toFixed(0) : '');
+  const [paidBy, setPaidBy] = useState(editMode ? expense?.paid_by : user?.id);
+  const [splitType, setSplitType] = useState(editMode && expense?.split_type !== 'equal' ? 'unequal' : 'equal'); // equal, unequal, item
+  const [selectedMembers, setSelectedMembers] = useState(
+    editMode ? splits.map(s => s.user_id) : (isPersonal ? [user?.id] : initialMembers.map(m => m.user_id))
+  );
   const [saving, setSaving] = useState(false);
 
   // Unequal Modal State
   const [showUnequalModal, setShowUnequalModal] = useState(false);
-  const [unequalMode, setUnequalMode] = useState('amount'); // 'amount' or 'shares'
-  const [customAmounts, setCustomAmounts] = useState({});
-  const [customShares, setCustomShares] = useState(
-    initialMembers.reduce((acc, m) => ({ ...acc, [m.user_id]: '1' }), {})
-  );
-  const [editedAmounts, setEditedAmounts] = useState(new Set());
+  const initialUnequalMode = editMode && expense?.split_type === 'percentage' ? 'shares' : 'amount';
+  const [unequalMode, setUnequalMode] = useState(initialUnequalMode); // 'amount' or 'shares'
+  
+  const [customAmounts, setCustomAmounts] = useState(() => {
+    if (editMode && expense?.split_type === 'custom') {
+      return splits.reduce((acc, s) => ({ ...acc, [s.user_id]: parseFloat(s.amount).toFixed(0) }), {});
+    }
+    return {};
+  });
+
+  const [customShares, setCustomShares] = useState(() => {
+    if (editMode && expense?.split_type === 'percentage') {
+      return splits.reduce((acc, s) => ({ ...acc, [s.user_id]: parseFloat(s.percentage).toFixed(0) }), {});
+    }
+    return initialMembers.reduce((acc, m) => ({ ...acc, [m.user_id]: '1' }), {});
+  });
+  
+  const [editedAmounts, setEditedAmounts] = useState(new Set(
+    editMode && expense?.split_type === 'custom' ? splits.map(s => s.user_id) : []
+  ));
 
   // Add Member Modal State
   const [showAddMember, setShowAddMember] = useState(false);
@@ -138,11 +156,25 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
     }
   };
 
-  const getSplitAmount = () => {
-    if (!price || isNaN(price)) return 0;
-    const total = parseFloat(price);
-    if (selectedMembers.length === 0) return 0;
-    return (total / selectedMembers.length).toFixed(0);
+  const getSplitAmount = (userId) => {
+    if (!price || isNaN(price)) return '0';
+    if (!selectedMembers.includes(userId)) return '0';
+    
+    if (splitType === 'equal') {
+      const total = parseFloat(price);
+      if (selectedMembers.length === 0) return '0';
+      return (total / selectedMembers.length).toFixed(0);
+    } else if (splitType === 'unequal') {
+      if (unequalMode === 'amount') {
+        return parseFloat(customAmounts[userId] || 0).toFixed(0);
+      } else if (unequalMode === 'shares') {
+        const totalShares = selectedMembers.reduce((sum, id) => sum + parseFloat(customShares[id] || 0), 0);
+        if (totalShares === 0) return '0';
+        const userShare = parseFloat(customShares[userId] || 0);
+        return ((userShare / totalShares) * parseFloat(price)).toFixed(0);
+      }
+    }
+    return '0';
   };
 
   const handleAmountChange = (userId, val) => {
@@ -229,18 +261,37 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
 
     setSaving(true);
     try {
-      await api.post(`/groups/${groupId}/expenses`, {
-        title: description,
-        amount: parseFloat(price),
-        category: category,
-        split_type: backendSplitType,
-        note: description,
-        paid_by: paidBy,
-        members: membersPayload,
-      });
-      navigation.goBack();
+      if (isPersonal) {
+        // Handle personal bill creation
+        const payload = {
+          title: description,
+          amount: parseFloat(price),
+          category: category,
+          note: description
+        };
+        // For now, let's just log it or hit a placeholder endpoint since the backend route isn't created yet
+        await api.post('/bills', payload).catch(() => console.log('Bills endpoint not ready'));
+        navigation.goBack();
+      } else {
+        const payload = {
+          title: description,
+          amount: parseFloat(price),
+          category: category,
+          split_type: backendSplitType,
+          note: description,
+          paid_by: paidBy,
+          members: membersPayload,
+        };
+
+        if (editMode) {
+          await api.put(`/groups/${groupId}/expenses/${expense.id}`, payload);
+        } else {
+          await api.post(`/groups/${groupId}/expenses`, payload);
+        }
+        navigation.goBack();
+      }
     } catch (e) {
-      alert('Failed: ' + (e.response?.data?.error || e.message));
+      Alert.alert('Failed', e.response?.data?.error || e.message);
     } finally {
       setSaving(false);
     }
@@ -259,29 +310,35 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <ChevronLeft color={colors.textPrimary} size={24} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Add Expense</Text>
-          <View style={styles.groupBadge}>
-            <Text style={styles.groupBadgeText}>{groupName}</Text>
-          </View>
+          <Text style={styles.headerTitle}>
+            {isPersonal ? (editMode ? 'Edit Bill' : 'Add Bill') : (editMode ? 'Edit Expense' : 'Add Expense')}
+          </Text>
+          {!isPersonal && (
+            <View style={styles.groupBadge}>
+              <Text style={styles.groupBadgeText}>{groupName}</Text>
+            </View>
+          )}
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           
           {/* Members Strip */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.membersStrip}>
-            <TouchableOpacity style={styles.addFriendCircle} onPress={handleOpenContacts}>
-              <Plus color={colors.surface} size={24} />
-            </TouchableOpacity>
-            
-            {members.map(m => (
-              <View key={m.user_id} style={styles.memberAvatarContainer}>
-                <View style={styles.memberAvatar}>
-                  <Text style={styles.memberAvatarInitials}>{m.name?.charAt(0).toUpperCase()}</Text>
+          {!isPersonal && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.membersStrip}>
+              <TouchableOpacity style={styles.addFriendCircle} onPress={handleOpenContacts}>
+                <Plus color={colors.surface} size={24} />
+              </TouchableOpacity>
+              
+              {members.map(m => (
+                <View key={m.user_id} style={styles.memberAvatarContainer}>
+                  <View style={styles.memberAvatar}>
+                    <Text style={styles.memberAvatarInitials}>{m.name?.charAt(0).toUpperCase()}</Text>
+                  </View>
+                  <Text style={styles.memberName}>{m.user_id === user?.id ? 'You' : m.name.split(' ')[0]}</Text>
                 </View>
-                <Text style={styles.memberName}>{m.user_id === user.id ? 'You' : m.name.split(' ')[0]}</Text>
-              </View>
-            ))}
-          </ScrollView>
+              ))}
+            </ScrollView>
+          )}
 
           {/* Bill Action Row */}
           <View style={styles.billActionRow}>
@@ -361,49 +418,53 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
             </View>
 
             {/* Split Section */}
-            <View style={styles.splitSection}>
-              <Text style={styles.label}>Split</Text>
-              <View style={styles.splitToggles}>
-                <TouchableOpacity style={[styles.splitBtn, splitType === 'equal' && styles.splitBtnActive]} onPress={() => handleSplitTypePress('equal')}>
-                  <Text style={[styles.splitBtnText, splitType === 'equal' && styles.splitBtnTextActive]}>Equally</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.splitBtn, splitType === 'unequal' && styles.splitBtnActive]} onPress={() => handleSplitTypePress('unequal')}>
-                  <Text style={[styles.splitBtnText, splitType === 'unequal' && styles.splitBtnTextActive]}>Unequally</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.splitBtn, splitType === 'item' && styles.splitBtnActive]} onPress={() => handleSplitTypePress('item')}>
-                  <Text style={[styles.splitBtnText, splitType === 'item' && styles.splitBtnTextActive]}>Item wise</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+            {!isPersonal && (
+              <>
+                <View style={styles.splitSection}>
+                  <Text style={styles.label}>Split</Text>
+                  <View style={styles.splitToggles}>
+                    <TouchableOpacity style={[styles.splitBtn, splitType === 'equal' && styles.splitBtnActive]} onPress={() => handleSplitTypePress('equal')}>
+                      <Text style={[styles.splitBtnText, splitType === 'equal' && styles.splitBtnTextActive]}>Equally</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.splitBtn, splitType === 'unequal' && styles.splitBtnActive]} onPress={() => handleSplitTypePress('unequal')}>
+                      <Text style={[styles.splitBtnText, splitType === 'unequal' && styles.splitBtnTextActive]}>Unequally</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.splitBtn, splitType === 'item' && styles.splitBtnActive]} onPress={() => handleSplitTypePress('item')}>
+                      <Text style={[styles.splitBtnText, splitType === 'item' && styles.splitBtnTextActive]}>Item wise</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
 
-            {/* Split Among (Visible on main screen) */}
-            {splitType === 'equal' && (
-              <View style={styles.splitAmongSection}>
-                <Text style={styles.label}>Split among <Text style={styles.labelLight}>( Tap to unselect )</Text></Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.splitMembersList}>
-                  {members.map(m => {
-                    const isSelected = selectedMembers.includes(m.user_id);
-                    return (
-                      <TouchableOpacity 
-                        key={m.user_id} 
-                        style={[styles.splitMemberCard, isSelected && styles.splitMemberCardActive]}
-                        onPress={() => toggleMember(m.user_id)}
-                      >
-                        <View style={[styles.splitMemberTop, isSelected && styles.splitMemberTopActive]}>
-                          <Text style={[styles.splitMemberName, isSelected && styles.splitMemberNameActive]}>
-                            {m.user_id === user.id ? 'You' : m.name.split(' ')[0]}
-                          </Text>
-                        </View>
-                        <View style={styles.splitMemberBottom}>
-                          <Text style={styles.splitMemberAmount}>
-                            {isSelected ? getSplitAmount() : '0'}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
+                {/* Split Among (Visible on main screen) */}
+                {splitType !== 'item' && (
+                  <View style={styles.splitAmongSection}>
+                    <Text style={styles.label}>Split among <Text style={styles.labelLight}>( Tap to unselect )</Text></Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.splitMembersList}>
+                      {members.map(m => {
+                        const isSelected = selectedMembers.includes(m.user_id);
+                        return (
+                          <TouchableOpacity 
+                            key={m.user_id} 
+                            style={[styles.splitMemberCard, isSelected && styles.splitMemberCardActive]}
+                            onPress={() => toggleMember(m.user_id)}
+                          >
+                            <View style={[styles.splitMemberTop, isSelected && styles.splitMemberTopActive]}>
+                              <Text style={[styles.splitMemberName, isSelected && styles.splitMemberNameActive]}>
+                                {m.user_id === user?.id ? 'You' : m.name.split(' ')[0]}
+                              </Text>
+                            </View>
+                            <View style={styles.splitMemberBottom}>
+                              <Text style={styles.splitMemberAmount}>
+                                {getSplitAmount(m.user_id)}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                )}
+              </>
             )}
 
             <View style={styles.dashedDivider} />
@@ -425,7 +486,7 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
         {/* Submit Footer */}
         <View style={styles.footer}>
           <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={saving}>
-            {saving ? <ActivityIndicator color="#FFF" /> : <Text style={styles.submitBtnText}>Submit expense</Text>}
+            {saving ? <ActivityIndicator color="#FFF" /> : <Text style={styles.submitBtnText}>{editMode ? 'Save Changes' : 'Submit expense'}</Text>}
           </TouchableOpacity>
         </View>
 

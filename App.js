@@ -3,17 +3,20 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import { Home, Users, PieChart, Receipt, User } from 'lucide-react-native';
+import { Home, Users, PieChart, Receipt, User, CreditCard } from 'lucide-react-native';
 
 import DashboardScreen from './src/screens/DashboardScreen';
 import GroupsScreen from './src/screens/GroupsScreen';
 import AnalyticsScreen from './src/screens/AnalyticsScreen';
+import BillsScreen from './src/screens/BillsScreen';
+import BalancesScreen from './src/screens/BalancesScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import AddExpenseScreen from './src/screens/AddExpenseScreen';
 import SignupScreen from './src/screens/SignupScreen';
 import CreateGroupScreen from './src/screens/CreateGroupScreen';
 import GroupDetailScreen from './src/screens/GroupDetailScreen';
 import GroupAddExpenseScreen from './src/screens/GroupAddExpenseScreen';
+import ExpenseDetailScreen from './src/screens/ExpenseDetailScreen';
 import { colors } from './src/theme/colors';
 import { useAuth } from './src/store/useAuth';
 import React, { useEffect } from 'react';
@@ -67,17 +70,17 @@ function BottomTabs() {
         }}
       />
       <Tab.Screen 
-        name="Activity" 
-        component={AnalyticsScreen} 
+        name="Bills" 
+        component={BillsScreen} 
         options={{
           tabBarIcon: ({ color, size }) => <Receipt color={color} size={22} />
         }}
       />
       <Tab.Screen 
-        name="Profile" 
-        component={AnalyticsScreen} 
+        name="Balances" 
+        component={BalancesScreen} 
         options={{
-          tabBarIcon: ({ color, size }) => <User color={color} size={22} />
+          tabBarIcon: ({ color, size }) => <CreditCard color={color} size={22} />
         }}
       />
     </Tab.Navigator>
@@ -106,6 +109,7 @@ export default function App() {
             <Stack.Screen name="CreateGroup" component={CreateGroupScreen} options={{ presentation: 'modal' }} />
             <Stack.Screen name="GroupDetail" component={GroupDetailScreen} />
             <Stack.Screen name="GroupAddExpense" component={GroupAddExpenseScreen} options={{ presentation: 'modal', headerShown: false }} />
+            <Stack.Screen name="ExpenseDetail" component={ExpenseDetailScreen} options={{ headerShown: false }} />
           </>
         ) : (
           <>

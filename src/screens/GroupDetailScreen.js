@@ -5,10 +5,11 @@ import {
   Image, Share, Alert
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { ChevronLeft, Share2, Download, MessageSquare, Settings, Search, Plus } from 'lucide-react-native';
+import { ChevronLeft, ChevronDown, Share2, Download, MessageSquare, Settings, Search, Plus } from 'lucide-react-native';
 import * as Contacts from 'expo-contacts';
 import { colors } from '../theme/colors';
 import { api } from '../api/client';
+import { useAuth } from '../store/useAuth';
 
 const CATEGORIES = [
   { id: 'food', icon: '🍔' }, { id: 'transport', icon: '🚕' },
@@ -18,6 +19,8 @@ const CATEGORIES = [
 
 export default function GroupDetailScreen({ route, navigation }) {
   const { groupId, groupName } = route.params;
+  const { user } = useAuth();
+  
   const [group, setGroup] = useState(null);
   const [expenses, setExpenses] = useState([]);
   const [balances, setBalances] = useState([]);
@@ -163,6 +166,15 @@ export default function GroupDetailScreen({ route, navigation }) {
     </View>
   );
 
+  const myNetBalance = balances.reduce((acc, b) => {
+    if (b.from?.id === user?.id) return acc - parseFloat(b.amount);
+    if (b.to?.id === user?.id) return acc + parseFloat(b.amount);
+    return acc;
+  }, 0);
+
+  const myBalances = balances.filter(b => b.from?.id === user?.id || b.to?.id === user?.id);
+  const otherBalances = balances.filter(b => b.from?.id !== user?.id && b.to?.id !== user?.id);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
@@ -178,7 +190,7 @@ export default function GroupDetailScreen({ route, navigation }) {
         </View>
 
         <FlatList
-          data={activeTab === 'expense' ? filteredExpenses : activeTab === 'balance' ? balances : members}
+          data={activeTab === 'expense' ? filteredExpenses : activeTab === 'balance' ? otherBalances : []}
           keyExtractor={(item, index) => item.id?.toString() || index.toString()}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
@@ -240,13 +252,182 @@ export default function GroupDetailScreen({ route, navigation }) {
                   </View>
                 </View>
               )}
+              {/* Balance Tab Header Content */}
+              {activeTab === 'balance' && (
+                <View style={styles.balanceTabContent}>
+                  {/* Your Net Balance Card */}
+                  <View style={styles.netBalanceCard}>
+                    <View style={styles.netBalanceRow}>
+                      <View>
+                        <Text style={styles.netBalanceLabel}>YOUR NET BALANCE</Text>
+                        <Text style={styles.netBalanceSub}>Tap for more details</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={[styles.netBalanceAmount, { color: myNetBalance >= 0 ? '#10B981' : colors.danger }]}>
+                          {myNetBalance >= 0 ? '' : '-'}₹{Math.abs(myNetBalance).toFixed(0)}
+                        </Text>
+                        <View style={styles.expandIconBg}>
+                          <ChevronDown color={colors.textSecondary} size={16} />
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* My Balances (Settlement Cards) */}
+                    {myBalances.map(b => {
+                      const iOwe = b.from?.id === user?.id;
+                      return (
+                        <View key={b.from.id + '-' + b.to.id} style={styles.settlementCard}>
+                          <View style={styles.settlementFlow}>
+                            <View style={{ alignItems: 'center' }}>
+                              <View style={styles.settleAvatar}>
+                                <Text style={styles.settleAvatarText}>{b.from?.name?.charAt(0) || '?'}</Text>
+                              </View>
+                              <Text style={styles.settleName}>{b.from?.name}</Text>
+                              {b.from?.role === 'admin' && <Text style={styles.adminBadge}>Admin</Text>}
+                            </View>
+
+                            <View style={styles.settleArrowContainer}>
+                              <Text style={styles.settleArrowLine}>──────</Text>
+                              <View style={styles.settleArrowInfo}>
+                                <Text style={[styles.settleArrowAmount, { color: '#10B981' }]}>₹{parseFloat(b.amount).toFixed(0)}</Text>
+                                <Text style={styles.settleArrowSub}>will pay</Text>
+                              </View>
+                              <Text style={styles.settleArrowHead}>→</Text>
+                            </View>
+
+                            <View style={{ alignItems: 'center' }}>
+                              <View style={styles.settleAvatar}>
+                                <Text style={styles.settleAvatarText}>{b.to?.name?.charAt(0) || '?'}</Text>
+                              </View>
+                              <Text style={styles.settleName}>{b.to?.name}</Text>
+                              {b.to?.role === 'admin' && <Text style={styles.adminBadge}>Admin</Text>}
+                            </View>
+
+                            <View style={styles.settleActions}>
+                              <TouchableOpacity style={styles.remindBtn} onPress={() => Alert.alert('Coming Soon', 'Reminders will be sent automatically.')}>
+                                <Text style={styles.remindBtnText}>Remind</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity style={styles.settleUpBtn} onPress={() => Alert.alert('Coming Soon', 'In-app payments are coming soon!')}>
+                                <Text style={styles.settleUpBtnText}>Settle Up</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+
+                  {/* Simplify Balance Toggle */}
+                  <View style={styles.simplifyCard}>
+                    <View style={styles.simplifyHeaderRow}>
+                      <Text style={styles.simplifyTitle}>Simplify balance is turned off</Text>
+                      <View style={styles.toggleTrack}>
+                        <View style={styles.toggleThumb} />
+                      </View>
+                    </View>
+                    <Text style={styles.simplifyDesc}>We simplify your balances in a group to reduce the number of payments. It doesn't change anyone's total balance.</Text>
+                    <TouchableOpacity style={styles.simplifyLinkRow}>
+                      <Text style={styles.simplifyLink}>How it works?</Text>
+                      <ChevronDown color={colors.textSecondary} size={16} />
+                    </TouchableOpacity>
+                  </View>
+
+                  <TouchableOpacity style={styles.reportBtn}>
+                    <Text style={styles.reportBtnText}>Report a balance issue</Text>
+                  </TouchableOpacity>
+
+                  {otherBalances.length > 0 && (
+                    <Text style={styles.othersBalancesTitle}>Others' Balances</Text>
+                  )}
+                </View>
+              )}
+
+              {/* Summary Tab Content */}
+              {activeTab === 'summary' && (
+                <View style={styles.summaryLayout}>
+                  {/* Left Sidebar */}
+                  <View style={styles.summarySidebar}>
+                    <TouchableOpacity style={styles.sidebarBtnActive}>
+                      <Text style={styles.sidebarTextActive}>Category Wise</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.sidebarBtn}>
+                      <Text style={styles.sidebarText}>Your Spending</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.sidebarBtn}>
+                      <Text style={styles.sidebarText}>Total Spending</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.sidebarBtn}>
+                      <Text style={styles.sidebarText}>Others' Spending</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Main Summary Content */}
+                  <View style={styles.summaryMain}>
+                    <View style={styles.summaryHeaderCard}>
+                      <View style={styles.summaryHeaderTopRow}>
+                        <Text style={styles.summaryHeaderTitle}>Category-wise Summary</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <Text style={styles.summaryFilterText}>This Month</Text>
+                          <View style={styles.filterIconBg}>
+                            <Text style={styles.filterIcon}>▼</Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      {/* Toggle */}
+                      <View style={styles.summaryToggleContainer}>
+                        <TouchableOpacity style={styles.summaryToggleBtnActive}>
+                          <Text style={styles.summaryToggleTextActive}>Your</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.summaryToggleBtn}>
+                          <Text style={styles.summaryToggleText}>Group</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Donut Chart Placeholder */}
+                      <View style={styles.donutContainer}>
+                        <View style={styles.donutOuterRing}>
+                          <View style={styles.donutInnerHole}>
+                            <Text style={styles.donutCenterText}>₹ 850</Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      {/* Category Legend */}
+                      <View style={styles.legendRow}>
+                        <View style={[styles.legendDot, { backgroundColor: '#FFD166' }]} />
+                        <Text style={styles.legendText}>Food</Text>
+                        <Text style={styles.legendAmount}>₹ 500</Text>
+                      </View>
+                      <View style={styles.legendRow}>
+                        <View style={[styles.legendDot, { backgroundColor: '#EF476F' }]} />
+                        <Text style={styles.legendText}>Transport</Text>
+                        <Text style={styles.legendAmount}>₹ 350</Text>
+                      </View>
+                    </View>
+
+                    {/* Detailed List */}
+                    <View style={styles.detailedSummaryCard}>
+                      <Text style={styles.detailedSummaryTitle}>Food</Text>
+                      <View style={styles.detailedSummaryRow}>
+                        <Text style={styles.detailedSummaryDate}>25 Apr</Text>
+                        <Text style={styles.detailedSummaryCategory}>Food</Text>
+                        <Text style={styles.detailedSummaryAmount}>₹500</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              )}
             </>
           }
           ListEmptyComponent={activeTab === 'expense' ? renderEmptyState() : null}
           renderItem={({ item }) => {
             if (activeTab === 'expense') {
               return (
-                <View style={styles.expenseRow}>
+                <TouchableOpacity 
+                  style={styles.expenseRow}
+                  onPress={() => navigation.navigate('ExpenseDetail', { groupId, groupName, expenseId: item.id, members })}
+                >
                   <View style={styles.expenseIconBg}>
                     <Text>{CATEGORIES.find(c => c.id === item.category)?.icon ?? '💸'}</Text>
                   </View>
@@ -255,43 +436,29 @@ export default function GroupDetailScreen({ route, navigation }) {
                     <Text style={styles.expenseBy}>paid by {item.paid_by_name || 'you'}</Text>
                   </View>
                   <Text style={styles.expenseAmount}>₹{parseFloat(item.amount).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</Text>
-                </View>
+                </TouchableOpacity>
               );
             }
             if (activeTab === 'balance') {
               return (
-                <View style={styles.balanceRow}>
-                  <View style={styles.balanceAvatar}>
-                    <Text style={styles.balanceAvatarText}>{item.from?.name?.charAt(0) || '?'}</Text>
+                <View style={styles.otherBalanceCard}>
+                  <View style={styles.otherBalanceLeft}>
+                    <View style={styles.otherBalanceAvatar}>
+                      <Text style={styles.otherBalanceAvatarText}>{item.from?.name?.charAt(0) || '?'}</Text>
+                    </View>
+                    <Text style={styles.otherBalanceName}>{item.from?.name}</Text>
                   </View>
-                  <Text style={styles.balanceText}>
-                    <Text style={styles.balanceName}>{item.from?.name}</Text>
-                    <Text> owes </Text>
-                    <Text style={styles.balanceName}>{item.to?.name}</Text>
-                  </Text>
-                  <Text style={[styles.balanceAmount, { color: colors.danger }]}>₹{parseFloat(item.amount).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</Text>
+                  <View style={styles.otherBalanceRight}>
+                    <Text style={styles.otherBalanceOwes}>Owes <Text style={styles.otherBalanceAmount}>₹{parseFloat(item.amount).toFixed(0)}</Text></Text>
+                    <View style={styles.expandIconBgSmall}>
+                      <ChevronDown color={colors.textSecondary} size={14} />
+                    </View>
+                  </View>
                 </View>
               );
             }
             if (activeTab === 'summary') {
-              return (
-                <View style={styles.expenseRow}>
-                  <View style={[styles.expenseIconBg, { backgroundColor: colors.primaryLight }]}>
-                    <Text style={{ fontSize: 20, fontWeight: '700', color: colors.primary }}>
-                      {item.name?.charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={styles.expenseInfo}>
-                    <Text style={styles.expenseNote}>{item.name}</Text>
-                    <Text style={styles.expenseBy}>{item.email}</Text>
-                  </View>
-                  <View style={[styles.expenseIconBg, { backgroundColor: item.role === 'admin' ? colors.primaryLight : colors.background }]}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: item.role === 'admin' ? colors.primary : colors.textMuted }}>
-                      {item.role}
-                    </Text>
-                  </View>
-                </View>
-              );
+              return null; // Rendered in ListHeaderComponent now
             }
             return null;
           }}
@@ -456,6 +623,97 @@ const styles = StyleSheet.create({
   balanceText: { flex: 1, fontSize: 14, color: colors.textSecondary },
   balanceName: { fontWeight: '700', color: colors.textPrimary },
   balanceAmount: { fontSize: 16, fontWeight: '800' },
+
+  // Premium Balance UI Styles
+  balanceTabContent: { paddingHorizontal: 20, paddingTop: 10 },
+  netBalanceCard: { backgroundColor: colors.surface, borderRadius: 24, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 3, marginBottom: 20 },
+  netBalanceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
+  netBalanceLabel: { fontSize: 12, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.5, marginBottom: 4 },
+  netBalanceSub: { fontSize: 12, color: colors.textMuted },
+  netBalanceAmount: { fontSize: 24, fontWeight: '800', marginRight: 12 },
+  expandIconBg: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
+  
+  settlementCard: { marginTop: 16 },
+  settlementFlow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  settleAvatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#FFE4E1', justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  settleAvatarText: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+  settleName: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+  adminBadge: { fontSize: 10, fontWeight: '700', color: colors.surface, backgroundColor: '#8BA3A0', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, marginTop: 4 },
+  
+  settleArrowContainer: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, position: 'relative', top: -16 },
+  settleArrowLine: { color: colors.borderMedium, letterSpacing: -1 },
+  settleArrowInfo: { alignItems: 'center', position: 'absolute', top: -20 },
+  settleArrowAmount: { fontSize: 14, fontWeight: '800' },
+  settleArrowSub: { fontSize: 11, color: colors.textSecondary },
+  settleArrowHead: { color: colors.borderMedium, fontSize: 18, marginLeft: -4 },
+  
+  settleActions: { gap: 8, marginLeft: 16 },
+  remindBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 16, borderWidth: 1, borderColor: colors.primary, alignItems: 'center' },
+  remindBtnText: { color: colors.primary, fontSize: 12, fontWeight: '600' },
+  settleUpBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 16, backgroundColor: colors.primary, alignItems: 'center' },
+  settleUpBtnText: { color: colors.surface, fontSize: 12, fontWeight: '600' },
+
+  simplifyCard: { backgroundColor: colors.surface, borderRadius: 24, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, marginBottom: 20 },
+  simplifyHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  simplifyTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  toggleTrack: { width: 44, height: 24, borderRadius: 12, backgroundColor: '#5A67D8', justifyContent: 'center', paddingHorizontal: 2 },
+  toggleThumb: { width: 20, height: 20, borderRadius: 10, backgroundColor: colors.surface, alignSelf: 'flex-start' },
+  simplifyDesc: { fontSize: 13, color: colors.textSecondary, lineHeight: 20, marginBottom: 12 },
+  simplifyLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  simplifyLink: { fontSize: 14, fontWeight: '600', color: colors.primary },
+
+  reportBtn: { alignSelf: 'center', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 24, borderWidth: 1, borderColor: colors.textPrimary, marginBottom: 32 },
+  reportBtnText: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+
+  othersBalancesTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 16 },
+  otherBalanceCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.surface, marginHorizontal: 20, marginBottom: 12, padding: 16, borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  otherBalanceLeft: { flexDirection: 'row', alignItems: 'center' },
+  otherBalanceAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFE4E1', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  otherBalanceAvatarText: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  otherBalanceName: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  otherBalanceRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  otherBalanceOwes: { fontSize: 13, color: colors.textSecondary },
+  otherBalanceAmount: { fontSize: 15, fontWeight: '800', color: '#EF4444' },
+  expandIconBgSmall: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
+
+  // Premium Summary UI Styles
+  summaryLayout: { flexDirection: 'row', marginTop: 10, minHeight: 600 },
+  summarySidebar: { width: 100, backgroundColor: colors.surface, borderTopRightRadius: 24, paddingVertical: 16 },
+  sidebarBtnActive: { backgroundColor: '#5A67D8', paddingVertical: 16, paddingHorizontal: 10, borderTopRightRadius: 16, borderBottomRightRadius: 16, marginBottom: 8 },
+  sidebarTextActive: { color: colors.surface, fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  sidebarBtn: { paddingVertical: 16, paddingHorizontal: 10, marginBottom: 8 },
+  sidebarText: { color: colors.textPrimary, fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  
+  summaryMain: { flex: 1, padding: 16, paddingLeft: 12 },
+  summaryHeaderCard: { backgroundColor: colors.surface, borderRadius: 24, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 3, marginBottom: 16 },
+  summaryHeaderTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+  summaryHeaderTitle: { flex: 1, fontSize: 16, fontWeight: '700', color: '#5A67D8', marginRight: 8 },
+  summaryFilterText: { fontSize: 12, fontWeight: '600', color: '#5A67D8' },
+  filterIconBg: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#EDF2F7', justifyContent: 'center', alignItems: 'center' },
+  filterIcon: { fontSize: 10, color: '#5A67D8' },
+  
+  summaryToggleContainer: { flexDirection: 'row', backgroundColor: '#F4F8FB', borderRadius: 16, padding: 4, marginBottom: 24 },
+  summaryToggleBtnActive: { flex: 1, backgroundColor: colors.surface, paddingVertical: 10, borderRadius: 12, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
+  summaryToggleTextActive: { color: '#5A67D8', fontSize: 13, fontWeight: '700' },
+  summaryToggleBtn: { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
+  summaryToggleText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
+  
+  donutContainer: { alignItems: 'center', marginVertical: 16 },
+  donutOuterRing: { width: 140, height: 140, borderRadius: 70, backgroundColor: '#FFD166', justifyContent: 'center', alignItems: 'center' },
+  donutInnerHole: { width: 96, height: 96, borderRadius: 48, backgroundColor: '#F4F8FB', justifyContent: 'center', alignItems: 'center' },
+  donutCenterText: { fontSize: 16, fontWeight: '800', color: colors.textPrimary },
+  
+  legendRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, paddingHorizontal: 8 },
+  legendDot: { width: 12, height: 12, borderRadius: 6, marginRight: 12 },
+  legendText: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  legendAmount: { fontSize: 15, fontWeight: '800', color: colors.textPrimary },
+  
+  detailedSummaryCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  detailedSummaryTitle: { fontSize: 15, fontWeight: '800', color: colors.textPrimary, marginBottom: 12 },
+  detailedSummaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  detailedSummaryDate: { width: 60, fontSize: 13, color: colors.textSecondary },
+  detailedSummaryCategory: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+  detailedSummaryAmount: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
 
   fab: { position: 'absolute', bottom: 24, right: 24, width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', shadowColor: colors.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 8 },
 
