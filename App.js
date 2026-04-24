@@ -17,6 +17,7 @@ import CreateGroupScreen from './src/screens/CreateGroupScreen';
 import GroupDetailScreen from './src/screens/GroupDetailScreen';
 import GroupAddExpenseScreen from './src/screens/GroupAddExpenseScreen';
 import ExpenseDetailScreen from './src/screens/ExpenseDetailScreen';
+import PersonBalanceDetailScreen from './src/screens/PersonBalanceDetailScreen';
 import { colors } from './src/theme/colors';
 import { useAuth } from './src/store/useAuth';
 import React, { useEffect } from 'react';
@@ -110,6 +111,7 @@ export default function App() {
             <Stack.Screen name="GroupDetail" component={GroupDetailScreen} />
             <Stack.Screen name="GroupAddExpense" component={GroupAddExpenseScreen} options={{ presentation: 'modal', headerShown: false }} />
             <Stack.Screen name="ExpenseDetail" component={ExpenseDetailScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="PersonBalanceDetail" component={PersonBalanceDetailScreen} options={{ headerShown: false }} />
           </>
         ) : (
           <>
