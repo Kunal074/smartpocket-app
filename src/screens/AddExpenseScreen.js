@@ -31,16 +31,16 @@ export default function AddExpenseScreen({ navigation }) {
     try {
       await api.post('/expenses', {
         amount: parseFloat(amount),
-        category_id: category,
+        categoryId: category,          // backend expects camelCase
         note: note || 'Expense',
-        date: new Date().toISOString()
+        date: new Date().toISOString().slice(0, 10)  // send YYYY-MM-DD only
       });
       
-      // Navigate back to Dashboard
       navigation.goBack();
     } catch (error) {
-      console.error('Failed to add expense:', error);
-      alert('Failed to save expense');
+      const msg = error.response?.data?.error || error.message;
+      console.error('Failed to add expense:', msg);
+      alert('Failed to save expense: ' + msg);
     } finally {
       setIsLoading(false);
     }

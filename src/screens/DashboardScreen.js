@@ -20,7 +20,9 @@ export default function DashboardScreen({ navigation }) {
         try {
           const { data } = await api.get('/expenses');
           if (isActive) {
-            setExpenses(Array.isArray(data) ? data : (data.expenses ?? []));
+            // Backend returns { expenses: [...] }
+            const list = data.expenses ?? (Array.isArray(data) ? data : []);
+            setExpenses(list);
           }
         } catch (error) {
           if (error.response?.status === 401 && isActive) {
