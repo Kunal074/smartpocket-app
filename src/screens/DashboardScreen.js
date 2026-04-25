@@ -18,7 +18,7 @@ const { width } = Dimensions.get('window');
 
 const CATEGORY_ICONS = {
   food: '🍔', transport: '🚕', shopping: '🛍️',
-  bills: '📄', entertainment: '🎬', other: '💸'
+  bills: '📄', entertainment: '🎬', udhaar: '🤝', other: '💸'
 };
 
 export default function DashboardScreen({ navigation }) {
@@ -82,10 +82,10 @@ export default function DashboardScreen({ navigation }) {
     setIsSubmitting(true);
     try {
       const payload = {
-        title: udhaarType === 'gave' ? 'Given Udhaar' : 'Got Udhaar',
+        title: udhaarType === 'gave' ? 'Udhaar Diya' : 'Udhaar Mila',
         amount: parseFloat(udhaarAmount),
         split_type: 'custom',
-        category: 'other',
+        category: 'udhaar',
         note: 'Quick Udhaar',
         paid_by: udhaarType === 'gave' ? user.id : udhaarFriendId,
         members: [{ user_id: udhaarType === 'gave' ? udhaarFriendId : user.id, amount: parseFloat(udhaarAmount) }]
@@ -246,17 +246,25 @@ export default function DashboardScreen({ navigation }) {
 
           {/* Owed / Owe row */}
           <View style={styles.heroRow}>
-            <View style={styles.heroStat}>
+            <TouchableOpacity 
+              style={styles.heroStat}
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate('SmartSplit', { screen: 'Balances' })}
+            >
               <TrendingUp color="#6EE7B7" size={14} />
               <Text style={styles.heroStatLabel}>Aapko Lena Hai</Text>
               <Text style={[styles.heroStatAmount, { color: '#6EE7B7' }]}>₹{owedToYou.toFixed(0)}</Text>
-            </View>
+            </TouchableOpacity>
             <View style={styles.heroStatDivider} />
-            <View style={styles.heroStat}>
+            <TouchableOpacity 
+              style={styles.heroStat}
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate('SmartSplit', { screen: 'Balances' })}
+            >
               <TrendingDown color="#FCA5A5" size={14} />
               <Text style={styles.heroStatLabel}>Aapko Dena Hai</Text>
               <Text style={[styles.heroStatAmount, { color: '#FCA5A5' }]}>₹{youOwe.toFixed(0)}</Text>
-            </View>
+            </TouchableOpacity>
             <View style={styles.heroStatDivider} />
             <TouchableOpacity 
               style={styles.heroStat}
