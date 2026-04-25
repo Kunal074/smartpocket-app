@@ -14,11 +14,12 @@ export default function SignupScreen({ navigation }) {
   const { login } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSignup = async () => {
-    if (!name || !email || !password) {
+    if (!name || !email || !password || !phone) {
       alert('Please fill in all fields');
       return;
     }
@@ -29,7 +30,7 @@ export default function SignupScreen({ navigation }) {
 
     setIsLoading(true);
     try {
-      await api.post('/auth/signup', { name, email, password });
+      await api.post('/auth/signup', { name, email, phone, password });
       // Auto login after signup
       await login(email, password);
     } catch (err) {
@@ -87,6 +88,21 @@ export default function SignupScreen({ navigation }) {
                     onChangeText={setEmail}
                     keyboardType="email-address"
                     autoCapitalize="none"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Phone Number</Text>
+                <View style={styles.inputContainer}>
+                  <Text style={{ color: colors.textMuted, fontSize: 16, marginRight: 8 }}>📞</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter your phone"
+                    placeholderTextColor={colors.textMuted}
+                    value={phone}
+                    onChangeText={setPhone}
+                    keyboardType="phone-pad"
                   />
                 </View>
               </View>
