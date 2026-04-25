@@ -3,7 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import { Home, Users, PieChart, GitFork } from 'lucide-react-native';
+import { Home, Users, PieChart, GitFork, Settings } from 'lucide-react-native';
 
 import DashboardScreen from './src/screens/DashboardScreen';
 import GroupsScreen from './src/screens/GroupsScreen';
@@ -18,6 +18,10 @@ import GroupDetailScreen from './src/screens/GroupDetailScreen';
 import GroupAddExpenseScreen from './src/screens/GroupAddExpenseScreen';
 import ExpenseDetailScreen from './src/screens/ExpenseDetailScreen';
 import PersonBalanceDetailScreen from './src/screens/PersonBalanceDetailScreen';
+import GroupChatScreen from './src/screens/GroupChatScreen';
+import GroupSettingsScreen from './src/screens/GroupSettingsScreen';
+import GroupExpenseHistoryScreen from './src/screens/GroupExpenseHistoryScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
 import { colors } from './src/theme/colors';
 import { useAuth } from './src/store/useAuth';
 import React, { useEffect } from 'react';
@@ -118,6 +122,13 @@ function BottomTabs() {
           tabBarIcon: ({ color }) => <PieChart color={color} size={22} />,
         }}
       />
+      <Tab.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{
+          tabBarIcon: ({ color }) => <Settings color={color} size={22} />,
+        }}
+      />
     </Tab.Navigator>
   );
 }
@@ -147,6 +158,9 @@ export default function App() {
             <Stack.Screen name="GroupAddExpense" component={GroupAddExpenseScreen} options={{ presentation: 'modal', headerShown: false }} />
             <Stack.Screen name="ExpenseDetail" component={ExpenseDetailScreen} options={{ headerShown: false }} />
             <Stack.Screen name="PersonBalanceDetail" component={PersonBalanceDetailScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="GroupChat" component={GroupChatScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="GroupSettings" component={GroupSettingsScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="GroupExpenseHistory" component={GroupExpenseHistoryScreen} options={{ headerShown: false }} />
           </>
         ) : (
           <>

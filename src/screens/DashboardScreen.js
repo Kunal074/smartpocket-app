@@ -120,6 +120,7 @@ export default function DashboardScreen({ navigation }) {
       // Soft reload
       const balRes = await api.get('/balances');
       setBalanceData(balRes.data);
+      refreshExpenses();
     } catch (e) {
       Alert.alert('Error', e.response?.data?.error || e.message);
     } finally {

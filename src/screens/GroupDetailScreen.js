@@ -5,7 +5,7 @@ import {
   Image, Share, Alert
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { ChevronLeft, ChevronDown, Share2, Download, MessageSquare, Settings, Search, Plus } from 'lucide-react-native';
+import { ChevronLeft, ChevronDown, Share2, Download, MessageSquare, Settings, Search, Plus, History } from 'lucide-react-native';
 import * as Contacts from 'expo-contacts';
 import { colors } from '../theme/colors';
 import { api } from '../api/client';
@@ -209,13 +209,19 @@ export default function GroupDetailScreen({ route, navigation }) {
                   </View>
                   <Text style={styles.actionText}>Export</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.actionItem} onPress={() => handleComingSoon('Chat')}>
+                <TouchableOpacity style={styles.actionItem} onPress={() => navigation.navigate('GroupChat', { groupId, groupName })}>
                   <View style={styles.actionIconBg}>
                     <MessageSquare color={colors.primary} size={20} />
                   </View>
                   <Text style={styles.actionText}>Chat</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.actionItem} onPress={() => handleComingSoon('Group Settings')}>
+                <TouchableOpacity style={styles.actionItem} onPress={() => navigation.navigate('GroupExpenseHistory', { groupId, groupName })}>
+                  <View style={styles.actionIconBg}>
+                    <History color={colors.primary} size={20} />
+                  </View>
+                  <Text style={styles.actionText}>History</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.actionItem} onPress={() => navigation.navigate('GroupSettings', { groupId, groupName, groupData: group })}>
                   <View style={styles.actionIconBg}>
                     <Settings color={colors.primary} size={20} />
                   </View>

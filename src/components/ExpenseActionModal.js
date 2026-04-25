@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { Pencil, Trash2, MessageSquare, X, Check } from 'lucide-react-native';
 import { api } from '../api/client';
+import { useAuth } from '../store/useAuth';
 
 /**
  * ExpenseActionModal
@@ -23,12 +24,17 @@ export default function ExpenseActionModal({ visible, expense, onClose, onRefres
   const [editAmount, setEditAmount] = useState('');
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  const { user } = useAuth();
 
   if (!expense) return null;
 
   const isUdhaarMila = expense.categoryId === 'udhaar' && expense.note === 'Udhaar Mila';
   const isUdhaarDiya = expense.categoryId === 'udhaar' && expense.note === 'Udhaar Diya';
   const amountColor = isUdhaarMila ? '#10B981' : isUdhaarDiya ? '#EF4444' : '#EF4444';
+
+  const canEdit = true; // Everyone can edit
+  const canDelete = expense.type === 'personal'; // No one can delete group expenses
 
   const handleOpen = (m) => {
     if (m === 'edit') {
@@ -158,26 +164,32 @@ export default function ExpenseActionModal({ visible, expense, onClose, onRefres
         {/* Menu Mode */}
         {mode === 'menu' && (
           <View style={styles.actionsRow}>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => handleOpen('edit')}>
-              <View style={[styles.actionIcon, { backgroundColor: '#EEF2FF' }]}>
-                <Pencil color="#5A67D8" size={20} />
-              </View>
-              <Text style={styles.actionLabel}>Edit</Text>
-            </TouchableOpacity>
+            {canEdit ? (
+              <>
+                <TouchableOpacity style={styles.actionBtn} onPress={() => handleOpen('edit')}>
+                  <View style={[styles.actionIcon, { backgroundColor: '#EEF2FF' }]}>
+                    <Pencil color="#5A67D8" size={20} />
+                  </View>
+                  <Text style={styles.actionLabel}>Edit</Text>
+                </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionBtn} onPress={() => handleOpen('comment')}>
-              <View style={[styles.actionIcon, { backgroundColor: '#F0FDF4' }]}>
-                <MessageSquare color="#10B981" size={20} />
-              </View>
-              <Text style={styles.actionLabel}>Comment</Text>
-            </TouchableOpacity>
+                <TouchableOpacity style={styles.actionBtn} onPress={() => handleOpen('comment')}>
+                  <View style={[styles.actionIcon, { backgroundColor: '#F0FDF4' }]}>
+                    <MessageSquare color="#10B981" size={20} />
+                  </View>
+                  <Text style={styles.actionLabel}>Comment</Text>
+                </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionBtn} onPress={handleDelete} disabled={loading}>
-              <View style={[styles.actionIcon, { backgroundColor: '#FEF2F2' }]}>
-                {loading ? <ActivityIndicator color="#EF4444" size="small" /> : <Trash2 color="#EF4444" size={20} />}
-              </View>
-              <Text style={[styles.actionLabel, { color: '#EF4444' }]}>Delete</Text>
-            </TouchableOpacity>
+                {canDelete && (
+                  <TouchableOpacity style={styles.actionBtn} onPress={handleDelete} disabled={loading}>
+                    <View style={[styles.actionIcon, { backgroundColor: '#FEF2F2' }]}>
+                      {loading ? <ActivityIndicator color="#EF4444" size="small" /> : <Trash2 color="#EF4444" size={20} />}
+                    </View>
+                    <Text style={[styles.actionLabel, { color: '#EF4444' }]}>Delete</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            ) : null}
           </View>
         )}
 
