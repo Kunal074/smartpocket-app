@@ -95,7 +95,7 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
 
   const refreshMembers = async () => {
     try {
-      const { data } = await api.get(`/groups/${groupId}/members`);
+      const { data } = await api.get(isPersonal ? '/friends' : `/groups/${groupId}/members`);
       const newMembers = Array.isArray(data) ? data : [];
       setMembers(newMembers);
       
@@ -120,8 +120,9 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
     const phone = contact.phoneNumbers?.[0]?.number?.replace(/\s/g, '');
     if (!phone) { Alert.alert('Error', 'This contact has no phone number'); return; }
     try {
-      await api.post(`/groups/${groupId}/members`, { phone });
-      Alert.alert('Success', `\u2705 ${contact.name} added to the group!`);
+      if (isPersonal) await api.post('/friends', { phone });
+      else await api.post(`/groups/${groupId}/members`, { phone });
+      Alert.alert('Success', `\u2705 ${contact.name} added!`);
       refreshMembers();
     } catch (e) {
       Alert.alert('Error', e.response?.data?.error || e.message);
@@ -132,8 +133,9 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
     const email = memberEmail.trim();
     if (!email || !email.includes('@')) { Alert.alert('Error', 'Enter a valid email address'); return; }
     try {
-      await api.post(`/groups/${groupId}/members`, { email });
-      Alert.alert('Success', `\u2705 Member added successfully!`);
+      if (isPersonal) await api.post('/friends', { email });
+      else await api.post(`/groups/${groupId}/members`, { email });
+      Alert.alert('Success', `\u2705 Member added!`);
       setMemberEmail('');
       refreshMembers();
     } catch (e) {
@@ -261,18 +263,19 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
 
     setSaving(true);
     try {
-      if (isPersonal) {
-        // Handle personal bill creation
+      if (isPersonal && selectedMembers.length === 1 && selectedMembers[0] === user?.id) {
+        // Purely personal bill (no split)
         const payload = {
           title: description,
           amount: parseFloat(price),
-          category: category,
-          note: description
+          categoryId: category, // Matches old personal expenses schema
+          note: description,
+          date: new Date().toISOString().slice(0, 10)
         };
-        // For now, let's just log it or hit a placeholder endpoint since the backend route isn't created yet
-        await api.post('/bills', payload).catch(() => console.log('Bills endpoint not ready'));
+        await api.post('/expenses', payload);
         navigation.goBack();
       } else {
+        // Group or Direct Split
         const payload = {
           title: description,
           amount: parseFloat(price),
@@ -283,7 +286,10 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
           members: membersPayload,
         };
 
-        if (editMode) {
+        if (isPersonal) {
+          // Direct 1-on-1 Split
+          await api.post('/expenses/direct', payload);
+        } else if (editMode) {
           await api.put(`/groups/${groupId}/expenses/${expense.id}`, payload);
         } else {
           await api.post(`/groups/${groupId}/expenses`, payload);
@@ -323,22 +329,20 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           
           {/* Members Strip */}
-          {!isPersonal && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.membersStrip}>
-              <TouchableOpacity style={styles.addFriendCircle} onPress={handleOpenContacts}>
-                <Plus color={colors.surface} size={24} />
-              </TouchableOpacity>
-              
-              {members.map(m => (
-                <View key={m.user_id} style={styles.memberAvatarContainer}>
-                  <View style={styles.memberAvatar}>
-                    <Text style={styles.memberAvatarInitials}>{m.name?.charAt(0).toUpperCase()}</Text>
-                  </View>
-                  <Text style={styles.memberName}>{m.user_id === user?.id ? 'You' : m.name.split(' ')[0]}</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.membersStrip}>
+            <TouchableOpacity style={styles.addFriendCircle} onPress={handleOpenContacts}>
+              <Plus color={colors.surface} size={24} />
+            </TouchableOpacity>
+            
+            {members.map(m => (
+              <View key={m.user_id} style={styles.memberAvatarContainer}>
+                <View style={styles.memberAvatar}>
+                  <Text style={styles.memberAvatarInitials}>{m.name?.charAt(0).toUpperCase()}</Text>
                 </View>
-              ))}
-            </ScrollView>
-          )}
+                <Text style={styles.memberName}>{m.user_id === user?.id ? 'You' : m.name.split(' ')[0]}</Text>
+              </View>
+            ))}
+          </ScrollView>
 
           {/* Bill Action Row */}
           <View style={styles.billActionRow}>
@@ -418,53 +422,49 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
             </View>
 
             {/* Split Section */}
-            {!isPersonal && (
-              <>
-                <View style={styles.splitSection}>
-                  <Text style={styles.label}>Split</Text>
-                  <View style={styles.splitToggles}>
-                    <TouchableOpacity style={[styles.splitBtn, splitType === 'equal' && styles.splitBtnActive]} onPress={() => handleSplitTypePress('equal')}>
-                      <Text style={[styles.splitBtnText, splitType === 'equal' && styles.splitBtnTextActive]}>Equally</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.splitBtn, splitType === 'unequal' && styles.splitBtnActive]} onPress={() => handleSplitTypePress('unequal')}>
-                      <Text style={[styles.splitBtnText, splitType === 'unequal' && styles.splitBtnTextActive]}>Unequally</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.splitBtn, splitType === 'item' && styles.splitBtnActive]} onPress={() => handleSplitTypePress('item')}>
-                      <Text style={[styles.splitBtnText, splitType === 'item' && styles.splitBtnTextActive]}>Item wise</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
+            <View style={styles.splitSection}>
+              <Text style={styles.label}>Split</Text>
+              <View style={styles.splitToggles}>
+                <TouchableOpacity style={[styles.splitBtn, splitType === 'equal' && styles.splitBtnActive]} onPress={() => handleSplitTypePress('equal')}>
+                  <Text style={[styles.splitBtnText, splitType === 'equal' && styles.splitBtnTextActive]}>Equally</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.splitBtn, splitType === 'unequal' && styles.splitBtnActive]} onPress={() => handleSplitTypePress('unequal')}>
+                  <Text style={[styles.splitBtnText, splitType === 'unequal' && styles.splitBtnTextActive]}>Unequally</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.splitBtn, splitType === 'item' && styles.splitBtnActive]} onPress={() => handleSplitTypePress('item')}>
+                  <Text style={[styles.splitBtnText, splitType === 'item' && styles.splitBtnTextActive]}>Item wise</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
 
-                {/* Split Among (Visible on main screen) */}
-                {splitType !== 'item' && (
-                  <View style={styles.splitAmongSection}>
-                    <Text style={styles.label}>Split among <Text style={styles.labelLight}>( Tap to unselect )</Text></Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.splitMembersList}>
-                      {members.map(m => {
-                        const isSelected = selectedMembers.includes(m.user_id);
-                        return (
-                          <TouchableOpacity 
-                            key={m.user_id} 
-                            style={[styles.splitMemberCard, isSelected && styles.splitMemberCardActive]}
-                            onPress={() => toggleMember(m.user_id)}
-                          >
-                            <View style={[styles.splitMemberTop, isSelected && styles.splitMemberTopActive]}>
-                              <Text style={[styles.splitMemberName, isSelected && styles.splitMemberNameActive]}>
-                                {m.user_id === user?.id ? 'You' : m.name.split(' ')[0]}
-                              </Text>
-                            </View>
-                            <View style={styles.splitMemberBottom}>
-                              <Text style={styles.splitMemberAmount}>
-                                {getSplitAmount(m.user_id)}
-                              </Text>
-                            </View>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </ScrollView>
-                  </View>
-                )}
-              </>
+            {/* Split Among (Visible on main screen) */}
+            {splitType !== 'item' && (
+              <View style={styles.splitAmongSection}>
+                <Text style={styles.label}>Split among <Text style={styles.labelLight}>( Tap to unselect )</Text></Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.splitMembersList}>
+                  {members.map(m => {
+                    const isSelected = selectedMembers.includes(m.user_id);
+                    return (
+                      <TouchableOpacity 
+                        key={m.user_id} 
+                        style={[styles.splitMemberCard, isSelected && styles.splitMemberCardActive]}
+                        onPress={() => toggleMember(m.user_id)}
+                      >
+                        <View style={[styles.splitMemberTop, isSelected && styles.splitMemberTopActive]}>
+                          <Text style={[styles.splitMemberName, isSelected && styles.splitMemberNameActive]}>
+                            {m.user_id === user?.id ? 'You' : m.name.split(' ')[0]}
+                          </Text>
+                        </View>
+                        <View style={styles.splitMemberBottom}>
+                          <Text style={styles.splitMemberAmount}>
+                            {getSplitAmount(m.user_id)}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
             )}
 
             <View style={styles.dashedDivider} />

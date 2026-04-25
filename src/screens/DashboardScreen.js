@@ -78,6 +78,20 @@ export default function DashboardScreen({ navigation }) {
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 4);
 
+  const udhaarList = [];
+  if (balanceData?.byPerson) {
+    balanceData.byPerson.forEach(person => {
+      const directGroup = person.groups?.find(g => g.groupName === 'Udhaar (Direct)');
+      if (directGroup && Math.abs(directGroup.net) > 0.01) {
+        udhaarList.push({
+          userId: person.userId,
+          name: person.name,
+          net: directGroup.net
+        });
+      }
+    });
+  }
+
   if (isLoading) {
     return (
       <SafeAreaView style={[styles.safeArea, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -132,13 +146,13 @@ export default function DashboardScreen({ navigation }) {
           <View style={styles.heroRow}>
             <View style={styles.heroStat}>
               <TrendingUp color="#6EE7B7" size={14} />
-              <Text style={styles.heroStatLabel}>You Get</Text>
+              <Text style={styles.heroStatLabel}>Aapko Lena Hai</Text>
               <Text style={[styles.heroStatAmount, { color: '#6EE7B7' }]}>₹{owedToYou.toFixed(0)}</Text>
             </View>
             <View style={styles.heroStatDivider} />
             <View style={styles.heroStat}>
               <TrendingDown color="#FCA5A5" size={14} />
-              <Text style={styles.heroStatLabel}>You Owe</Text>
+              <Text style={styles.heroStatLabel}>Aapko Dena Hai</Text>
               <Text style={[styles.heroStatAmount, { color: '#FCA5A5' }]}>₹{youOwe.toFixed(0)}</Text>
             </View>
             <View style={styles.heroStatDivider} />
@@ -215,6 +229,34 @@ export default function DashboardScreen({ navigation }) {
             <Text style={styles.quickBtnLabel}>Balances</Text>
           </TouchableOpacity>
         </View>
+
+        {/* ── Udhaar (Direct Balances) ─────────────────── */}
+        {udhaarList.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Udhaar</Text>
+              <Text style={styles.sectionSubtitle}>Direct Friends</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 20, paddingRight: 8, paddingBottom: 10 }} style={{ marginHorizontal: -20 }}>
+              {udhaarList.map((friend) => {
+                const isOwed = friend.net > 0;
+                return (
+                  <View key={friend.userId} style={styles.udhaarCard}>
+                    <View style={styles.udhaarAvatar}>
+                      <Text style={styles.udhaarInitials}>{friend.name.charAt(0).toUpperCase()}</Text>
+                    </View>
+                    <Text style={styles.udhaarName} numberOfLines={1}>{friend.name.split(' ')[0]}</Text>
+                    <View style={[styles.udhaarBadge, { backgroundColor: isOwed ? '#ECFDF5' : '#FEF2F2' }]}>
+                      <Text style={[styles.udhaarAmount, { color: isOwed ? '#10B981' : '#EF4444' }]}>
+                        {isOwed ? '+' : '-'}₹{Math.abs(friend.net).toFixed(0)}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
 
         {/* ── Active Groups Preview ─────────────────────── */}
         {groups.length > 0 && (
@@ -396,6 +438,22 @@ const styles = StyleSheet.create({
   groupRowName: { fontSize: 15, fontWeight: '700', color: '#1E2340', marginBottom: 2 },
   groupRowMeta: { fontSize: 12, color: '#718096' },
   groupRowBal: { fontSize: 16, fontWeight: '800' },
+
+  // Udhaar / Direct Friends
+  sectionSubtitle: { fontSize: 12, color: '#718096', fontWeight: '600' },
+  udhaarCard: {
+    backgroundColor: '#fff', borderRadius: 20, padding: 14, marginRight: 12,
+    width: 100, alignItems: 'center', borderWidth: 1, borderColor: '#EAECF5',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 6, elevation: 1
+  },
+  udhaarAvatar: {
+    width: 46, height: 46, borderRadius: 23, backgroundColor: '#EEF2FF',
+    justifyContent: 'center', alignItems: 'center', marginBottom: 8
+  },
+  udhaarInitials: { fontSize: 18, fontWeight: '800', color: '#5A67D8' },
+  udhaarName: { fontSize: 13, fontWeight: '700', color: '#1E2340', marginBottom: 6 },
+  udhaarBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  udhaarAmount: { fontSize: 12, fontWeight: '800' },
 
   // Transactions
   txRow: {
