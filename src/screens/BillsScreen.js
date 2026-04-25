@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Platform, TouchableOpacity, ScrollView, Image } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, Platform, TouchableOpacity, ScrollView, FlatList, ActivityIndicator } from 'react-native';
 import { Search, Clock, User, Globe, Plus } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { api } from '../api/client';
@@ -143,7 +143,35 @@ export default function BillsScreen({ navigation }) {
 
         {/* Right Main Content */}
         <View style={styles.mainContent}>
-          {renderEmptyState()}
+          {loadingBills ? (
+            <ActivityIndicator style={{ marginTop: 40 }} color="#5A67D8" />
+          ) : bills.length === 0 ? (
+            <View style={styles.emptyStateContainer}>
+              <Text style={styles.emptyTitle}>No bills found!</Text>
+              <Text style={styles.emptySubtitle}>Tap 'Add Expense' below to start.</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={bills}
+              keyExtractor={item => item.id.toString()}
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item }) => {
+                const CATEGORY_ICONS = { food: '🍔', transport: '🚕', shopping: '🛍️', bills: '📄', entertainment: '🎬', other: '💸' };
+                const icon = CATEGORY_ICONS[item.category] || '💸';
+                const date = new Date(item.date || item.created_at);
+                return (
+                  <View style={styles.billRow}>
+                    <View style={styles.billIcon}><Text style={{ fontSize: 18 }}>{icon}</Text></View>
+                    <View style={styles.billInfo}>
+                      <Text style={styles.billTitle}>{item.title}</Text>
+                      <Text style={styles.billDate}>{date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</Text>
+                    </View>
+                    <Text style={styles.billAmount}>₹{parseFloat(item.amount).toFixed(0)}</Text>
+                  </View>
+                );
+              }}
+            />
+          )}
 
           <View style={styles.bottomActionContainer}>
             <TouchableOpacity 
@@ -208,4 +236,11 @@ const styles = StyleSheet.create({
   bottomActionContainer: { marginTop: 'auto', paddingBottom: 16 },
   addExpenseBtn: { backgroundColor: '#5A67D8', paddingVertical: 16, borderRadius: 12, alignItems: 'center' },
   addExpenseBtnText: { fontSize: 16, fontWeight: '700', color: colors.surface },
+
+  billRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: colors.borderLight },
+  billIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#F4F6FF', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  billInfo: { flex: 1 },
+  billTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginBottom: 3 },
+  billDate: { fontSize: 12, color: colors.textSecondary },
+  billAmount: { fontSize: 15, fontWeight: '800', color: colors.textPrimary },
 });
