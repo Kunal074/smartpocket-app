@@ -142,11 +142,15 @@ export default function DashboardScreen({ navigation }) {
               <Text style={[styles.heroStatAmount, { color: '#FCA5A5' }]}>₹{youOwe.toFixed(0)}</Text>
             </View>
             <View style={styles.heroStatDivider} />
-            <View style={styles.heroStat}>
+            <TouchableOpacity 
+              style={styles.heroStat}
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate('Analytics', { filter: 'month' })}
+            >
               <Wallet color="#A5B4FC" size={14} />
               <Text style={styles.heroStatLabel}>This Month</Text>
               <Text style={[styles.heroStatAmount, { color: '#A5B4FC' }]}>₹{monthSpend.toFixed(0)}</Text>
-            </View>
+            </TouchableOpacity>
           </View>
         </LinearGradient>
 

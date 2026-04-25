@@ -1,9 +1,9 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, Platform,
   ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, RefreshControl
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useRoute } from '@react-navigation/native';
 import { TrendingUp, TrendingDown, PieChart, BarChart2 } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { api } from '../api/client';
@@ -19,15 +19,25 @@ const CATEGORY_META = {
   other:         { icon: '💸', color: '#6B7280' },
 };
 
-export default function AnalyticsScreen() {
+export default function AnalyticsScreen({ route }) {
+  // If navigated from Dashboard with a filter
+  const initialTimeframe = route?.params?.filter || 'month';
+
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('Personal'); // Personal | Groups
+  const [timeframe, setTimeframe] = useState(initialTimeframe); // week | month | year
+
+  useEffect(() => {
+    if (route?.params?.filter) {
+      setTimeframe(route.params.filter);
+    }
+  }, [route?.params?.filter]);
 
   const fetchAnalytics = useCallback(async () => {
     try {
-      const res = await api.get('/analytics');
+      const res = await api.get(`/analytics?timeframe=${timeframe}`);
       setData(res.data);
     } catch (e) {
       console.warn('Failed to fetch analytics', e);
@@ -35,7 +45,7 @@ export default function AnalyticsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [timeframe]);
 
   useFocusEffect(useCallback(() => {
     setLoading(true);
@@ -44,7 +54,7 @@ export default function AnalyticsScreen() {
 
   const onRefresh = () => { setRefreshing(true); fetchAnalytics(); };
 
-  if (loading) {
+  if (loading && !data) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.center}>
@@ -54,14 +64,21 @@ export default function AnalyticsScreen() {
     );
   }
 
-  const monthly = data?.monthly || [];
+  const trends = data?.trends || [];
   const byCategory = data?.byCategory || [];
   const byGroup = data?.byGroup || [];
-  const comp = data?.comparison || { thisMonth: 0, lastMonth: 0, changePercent: 0 };
-  const maxMonthly = Math.max(...monthly.map(m => m.total), 1);
+  const comp = data?.comparison || { currentPeriod: 0, prevPeriod: 0, changePercent: 0 };
+  const maxTrend = Math.max(...trends.map(m => m.total), 1);
 
   // Compute total for donut %
   const categoryTotal = byCategory.reduce((s, c) => s + c.total, 0);
+
+  const getLabelForTimeframe = () => {
+    if (timeframe === 'week') return { curr: 'This Week', prev: 'Last Week' };
+    if (timeframe === 'year') return { curr: 'This Year', prev: 'Last Year' };
+    return { curr: 'This Month', prev: 'Last Month' };
+  };
+  const labels = getLabelForTimeframe();
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -85,13 +102,28 @@ export default function AnalyticsScreen() {
           </View>
         </View>
 
+        {/* Timeframe Filter */}
+        <View style={styles.filterContainer}>
+          {['week', 'month', 'year'].map(tf => (
+            <TouchableOpacity
+              key={tf}
+              style={[styles.filterBtn, timeframe === tf && styles.filterBtnActive]}
+              onPress={() => setTimeframe(tf)}
+            >
+              <Text style={[styles.filterText, timeframe === tf && styles.filterTextActive]}>
+                {tf.charAt(0).toUpperCase() + tf.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         {activeTab === 'Personal' ? (
           <>
-            {/* This Month vs Last Month */}
+            {/* This Period vs Last Period */}
             <View style={styles.compRow}>
               <View style={[styles.compCard, { backgroundColor: '#1E2340' }]}>
-                <Text style={styles.compLabelDark}>This Month</Text>
-                <Text style={styles.compAmountDark}>₹{comp.thisMonth.toFixed(0)}</Text>
+                <Text style={styles.compLabelDark}>{labels.curr} (Overall)</Text>
+                <Text style={styles.compAmountDark}>₹{comp.currentPeriod.toFixed(0)}</Text>
                 <View style={styles.compBadge}>
                   {comp.changePercent >= 0
                     ? <TrendingUp color="#EF4444" size={12} />
@@ -103,28 +135,28 @@ export default function AnalyticsScreen() {
                 </View>
               </View>
               <View style={styles.compCard}>
-                <Text style={styles.compLabel}>Last Month</Text>
-                <Text style={styles.compAmount}>₹{comp.lastMonth.toFixed(0)}</Text>
+                <Text style={styles.compLabel}>{labels.prev}</Text>
+                <Text style={styles.compAmount}>₹{comp.prevPeriod.toFixed(0)}</Text>
               </View>
             </View>
 
-            {/* Monthly Bar Chart */}
+            {/* Trend Bar Chart */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <BarChart2 color="#5A67D8" size={18} />
-                <Text style={styles.cardTitle}>Monthly Spending</Text>
+                <Text style={styles.cardTitle}>Spending Trend</Text>
               </View>
-              {monthly.length === 0 ? (
+              {trends.length === 0 ? (
                 <Text style={styles.emptyText}>No data yet</Text>
               ) : (
                 <View style={styles.barChart}>
-                  {monthly.map((m, i) => {
-                    const barHeight = Math.max((m.total / maxMonthly) * 120, 4);
+                  {trends.map((m, i) => {
+                    const barHeight = Math.max((m.total / maxTrend) * 120, 4);
                     return (
                       <View key={i} style={styles.barCol}>
                         <Text style={styles.barAmount}>₹{m.total >= 1000 ? (m.total / 1000).toFixed(1) + 'k' : m.total.toFixed(0)}</Text>
                         <View style={[styles.bar, { height: barHeight }]} />
-                        <Text style={styles.barLabel}>{m.month}</Text>
+                        <Text style={styles.barLabel}>{m.label}</Text>
                       </View>
                     );
                   })}
@@ -139,7 +171,7 @@ export default function AnalyticsScreen() {
                 <Text style={styles.cardTitle}>By Category</Text>
               </View>
               {byCategory.length === 0 ? (
-                <Text style={styles.emptyText}>No expenses this month</Text>
+                <Text style={styles.emptyText}>No expenses this {timeframe}</Text>
               ) : (
                 byCategory.map((cat, i) => {
                   const meta = CATEGORY_META[cat.category] || CATEGORY_META.other;
@@ -165,10 +197,10 @@ export default function AnalyticsScreen() {
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <BarChart2 color="#5A67D8" size={18} />
-              <Text style={styles.cardTitle}>Group Spending (This Month)</Text>
+              <Text style={styles.cardTitle}>Group Spending (This {timeframe.charAt(0).toUpperCase() + timeframe.slice(1)})</Text>
             </View>
             {byGroup.length === 0 ? (
-              <Text style={styles.emptyText}>No group expenses this month</Text>
+              <Text style={styles.emptyText}>No group expenses this {timeframe}</Text>
             ) : (
               byGroup.map((g, i) => {
                 const maxG = Math.max(...byGroup.map(x => x.total), 1);
@@ -197,13 +229,19 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#F8F9FF', paddingTop: Platform.OS === 'android' ? 30 : 0 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
-  header: { paddingHorizontal: 20, paddingVertical: 16 },
+  header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 10 },
   headerTitle: { fontSize: 32, fontWeight: '900', color: colors.textPrimary, marginBottom: 14 },
   headerTabs: { flexDirection: 'row', backgroundColor: '#EAECF5', borderRadius: 12, padding: 4 },
   headerTab: { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center' },
   headerTabActive: { backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
   headerTabText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
   headerTabTextActive: { color: '#5A67D8', fontWeight: '800' },
+
+  filterContainer: { flexDirection: 'row', paddingHorizontal: 20, marginBottom: 16, gap: 8 },
+  filterBtn: { paddingVertical: 6, paddingHorizontal: 16, borderRadius: 20, backgroundColor: '#EAECF5' },
+  filterBtnActive: { backgroundColor: '#5A67D8' },
+  filterText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
+  filterTextActive: { color: '#fff' },
 
   compRow: { flexDirection: 'row', gap: 12, marginHorizontal: 20, marginBottom: 16 },
   compCard: {
@@ -231,8 +269,8 @@ const styles = StyleSheet.create({
   barChart: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, justifyContent: 'space-between' },
   barCol: { flex: 1, alignItems: 'center' },
   barAmount: { fontSize: 9, color: colors.textSecondary, marginBottom: 4, fontWeight: '600' },
-  bar: { width: '70%', backgroundColor: '#5A67D8', borderRadius: 6, minHeight: 4 },
-  barLabel: { fontSize: 10, color: colors.textSecondary, marginTop: 6, fontWeight: '600' },
+  bar: { width: '100%', maxWidth: 30, backgroundColor: '#5A67D8', borderRadius: 6, minHeight: 4 },
+  barLabel: { fontSize: 10, color: colors.textSecondary, marginTop: 6, fontWeight: '600', textAlign: 'center' },
 
   // Category rows
   catRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14, gap: 8 },
