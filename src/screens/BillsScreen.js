@@ -114,17 +114,20 @@ export default function BillsScreen({ navigation }) {
           <View style={styles.bottomActionContainer}>
             <TouchableOpacity 
               style={styles.addExpenseBtn}
-              onPress={() => {
+              onPress={async () => {
                 if (activeSideTab === 'Non Group') {
-                  // Wait, GroupAddExpense expects a groupId. We can pass a personal group or handle it inside GroupAddExpense.
-                  alert('Personal expenses coming soon!');
+                  navigation.navigate('GroupAddExpense', { members: [], groupId: null, groupName: null });
                 } else if (activeSideTab === 'Recent') {
                   alert('Select a group or non-group first!');
                 } else {
-                  // It's a specific group
                   const group = groups.find(g => g.id === activeSideTab);
                   if (group) {
-                    navigation.navigate('GroupAddExpense', { groupId: group.id, groupName: group.name, members: [] }); // Need actual members
+                    try {
+                      const res = await api.get(`/groups/${group.id}/members`);
+                      navigation.navigate('GroupAddExpense', { groupId: group.id, groupName: group.name, members: res.data });
+                    } catch {
+                      navigation.navigate('GroupAddExpense', { groupId: group.id, groupName: group.name, members: [] });
+                    }
                   }
                 }
               }}

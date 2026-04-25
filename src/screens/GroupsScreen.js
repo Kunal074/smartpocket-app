@@ -129,7 +129,7 @@ export default function GroupsScreen({ navigation }) {
           )}
           <TouchableOpacity 
             style={styles.quickAddBtn}
-            onPress={() => navigation.navigate('GroupAddExpense', { groupId: item.id, groupName: item.name, members: [] })} // Passing members ideally needs a fetch or derived list
+            onPress={() => handleQuickAdd(item)}
           >
             <Plus color="#5A67D8" size={20} />
           </TouchableOpacity>
