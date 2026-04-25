@@ -1,12 +1,14 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, Platform,
-  ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, RefreshControl
+  ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, RefreshControl,
+  Modal, FlatList, Alert
 } from 'react-native';
 import { useFocusEffect, useRoute } from '@react-navigation/native';
 import { TrendingUp, TrendingDown, PieChart, BarChart2 } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { api } from '../api/client';
+import ExpenseActionModal from '../components/ExpenseActionModal';
 
 const { width } = Dimensions.get('window');
 
@@ -16,6 +18,7 @@ const CATEGORY_META = {
   shopping:      { icon: '🛍️', color: '#8B5CF6' },
   bills:         { icon: '📄', color: '#EF4444' },
   entertainment: { icon: '🎬', color: '#EC4899' },
+  udhaar:        { icon: '🤝', color: '#10B981' },
   other:         { icon: '💸', color: '#6B7280' },
 };
 
@@ -46,6 +49,69 @@ export default function AnalyticsScreen({ route }) {
       setRefreshing(false);
     }
   }, [timeframe]);
+
+  // Details Modal State
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [categoryExpenses, setCategoryExpenses] = useState([]);
+  const [loadingCategory, setLoadingCategory] = useState(false);
+  const [selectedExpenseForAction, setSelectedExpenseForAction] = useState(null);
+
+  const handleCategoryPress = async (category) => {
+    setSelectedCategory(category);
+    setLoadingCategory(true);
+    try {
+      const res = await api.get('/expenses');
+      const allExpenses = res.data.expenses || [];
+      const filtered = allExpenses.filter(e => {
+        if (e.categoryId !== category) return false;
+        
+        const date = new Date(e.date);
+        const now = new Date();
+        if (timeframe === 'week') {
+          return date >= new Date(now.setDate(now.getDate() - 7));
+        } else if (timeframe === 'month') {
+          const monthStart = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+          return date >= monthStart; 
+        } else {
+          return date >= new Date(now.getFullYear(), 0, 1);
+        }
+      });
+      setCategoryExpenses(filtered);
+    } catch (e) {
+      console.warn('Failed to fetch category details', e);
+    } finally {
+      setLoadingCategory(false);
+    }
+  };
+
+  const handleGroupPress = async (group) => {
+    setSelectedGroup(group);
+    setLoadingCategory(true);
+    try {
+      const res = await api.get('/expenses');
+      const allExpenses = res.data.expenses || [];
+      const filtered = allExpenses.filter(e => {
+        if (e.groupId !== group.groupId) return false;
+        
+        const date = new Date(e.date);
+        const now = new Date();
+        if (timeframe === 'week') {
+          return date >= new Date(now.setDate(now.getDate() - 7));
+        } else if (timeframe === 'month') {
+          const monthStart = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+          return date >= monthStart; 
+        } else {
+          return date >= new Date(now.getFullYear(), 0, 1);
+        }
+      });
+      setCategoryExpenses(filtered);
+    } catch (e) {
+      console.warn('Failed to fetch group details', e);
+    } finally {
+      setLoadingCategory(false);
+    }
+  };
 
   useFocusEffect(useCallback(() => {
     setLoading(true);
@@ -177,7 +243,12 @@ export default function AnalyticsScreen({ route }) {
                   const meta = CATEGORY_META[cat.category] || CATEGORY_META.other;
                   const pct = categoryTotal > 0 ? ((cat.total / categoryTotal) * 100).toFixed(0) : 0;
                   return (
-                    <View key={i} style={styles.catRow}>
+                    <TouchableOpacity 
+                      key={i} 
+                      style={styles.catRow}
+                      activeOpacity={0.7}
+                      onPress={() => handleCategoryPress(cat.category)}
+                    >
                       <View style={[styles.catDot, { backgroundColor: meta.color }]} />
                       <Text style={styles.catIcon}>{meta.icon}</Text>
                       <Text style={styles.catName}>{cat.category.charAt(0).toUpperCase() + cat.category.slice(1)}</Text>
@@ -186,7 +257,7 @@ export default function AnalyticsScreen({ route }) {
                       </View>
                       <Text style={styles.catPct}>{pct}%</Text>
                       <Text style={styles.catAmount}>₹{cat.total.toFixed(0)}</Text>
-                    </View>
+                    </TouchableOpacity>
                   );
                 })
               )}
@@ -206,13 +277,18 @@ export default function AnalyticsScreen({ route }) {
                 const maxG = Math.max(...byGroup.map(x => x.total), 1);
                 const pct = Math.max((g.total / maxG) * 100, 2);
                 return (
-                  <View key={i} style={styles.groupRow}>
+                  <TouchableOpacity 
+                    key={i} 
+                    style={styles.groupRow}
+                    activeOpacity={0.7}
+                    onPress={() => handleGroupPress(g)}
+                  >
                     <Text style={styles.groupRowName}>{g.groupName}</Text>
                     <View style={styles.catBarBg}>
                       <View style={[styles.catBarFill, { width: `${pct}%`, backgroundColor: '#5A67D8' }]} />
                     </View>
                     <Text style={styles.catAmount}>₹{g.total.toFixed(0)}</Text>
-                  </View>
+                  </TouchableOpacity>
                 );
               })
             )}
@@ -221,6 +297,71 @@ export default function AnalyticsScreen({ route }) {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* ── Details Modal ───────────────────────── */}
+      <Modal 
+        visible={!!selectedCategory || !!selectedGroup} 
+        animationType="slide" 
+        presentationStyle="pageSheet"
+        onRequestClose={() => { setSelectedCategory(null); setSelectedGroup(null); }}
+      >
+        <SafeAreaView style={styles.modalSafe}>
+          <View style={styles.modalHeader}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {selectedCategory && <Text style={{ fontSize: 24 }}>{(CATEGORY_META[selectedCategory] || CATEGORY_META.other).icon}</Text>}
+              {selectedGroup && <Text style={{ fontSize: 24 }}>👥</Text>}
+              <Text style={styles.modalTitle}>
+                {selectedCategory ? selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1) : ''}
+                {selectedGroup ? selectedGroup.groupName : ''} Details
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => { setSelectedCategory(null); setSelectedGroup(null); }}>
+              <Text style={styles.modalCancel}>Close</Text>
+            </TouchableOpacity>
+          </View>
+
+          {loadingCategory ? (
+            <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
+          ) : categoryExpenses.length === 0 ? (
+            <Text style={[styles.emptyText, { marginTop: 40, textAlign: 'center' }]}>No detailed expenses found.</Text>
+          ) : (
+            <FlatList
+              data={categoryExpenses}
+              keyExtractor={(item, index) => `${item.id}-${index}`}
+              contentContainerStyle={styles.detailsList}
+              renderItem={({ item }) => {
+                const isUM = item.categoryId === 'udhaar' && item.note === 'Udhaar Mila';
+                const ac = isUM ? '#10B981' : '#EF4444';
+                const ap = isUM ? '+' : '−';
+                return (
+                  <TouchableOpacity 
+                    style={styles.detailRow}
+                    activeOpacity={0.7}
+                    onPress={() => setSelectedExpenseForAction(item)}
+                  >
+                    <View style={styles.detailInfo}>
+                      <Text style={styles.detailTitle} numberOfLines={1}>
+                        {item.note || 'No Title'}
+                        {item.with_user ? ` • ${item.with_user}` : ''}
+                      </Text>
+                      <Text style={styles.detailDate}>{new Date(item.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} • {item.type}</Text>
+                    </View>
+                    <Text style={[styles.detailAmount, { color: ac }]}>{ap}₹{parseFloat(item.amount).toFixed(0)}</Text>
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          )}
+        </SafeAreaView>
+      </Modal>
+
+      {/* ── Expense Action Modal ───────────────────────── */}
+      <ExpenseActionModal
+        visible={!!selectedExpenseForAction}
+        expense={selectedExpenseForAction}
+        onClose={() => setSelectedExpenseForAction(null)}
+        onRefresh={() => { setSelectedCategory(null); setSelectedGroup(null); fetchAnalytics(); }}
+      />
     </SafeAreaView>
   );
 }
@@ -282,7 +423,18 @@ const styles = StyleSheet.create({
   catPct: { fontSize: 11, color: colors.textSecondary, width: 30, textAlign: 'right' },
   catAmount: { fontSize: 12, fontWeight: '700', color: colors.textPrimary, width: 60, textAlign: 'right' },
 
-  // Group rows
   groupRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14, gap: 10 },
   groupRowName: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, width: 80 },
+
+  // Category Details Modal Styles
+  modalSafe: { flex: 1, backgroundColor: '#F8F9FF' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#EAECF5' },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: '#1E2340' },
+  modalCancel: { fontSize: 16, fontWeight: '600', color: '#5A67D8' },
+  detailsList: { padding: 20 },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', padding: 16, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: '#EAECF5' },
+  detailInfo: { flex: 1, paddingRight: 16 },
+  detailTitle: { fontSize: 16, fontWeight: '700', color: '#1E2340', marginBottom: 4 },
+  detailDate: { fontSize: 13, color: '#718096', textTransform: 'capitalize' },
+  detailAmount: { fontSize: 18, fontWeight: '800', color: '#EF4444' }
 });

@@ -1,7 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  SafeAreaView, Platform, ActivityIndicator, Alert, Dimensions, TextInput
+  SafeAreaView, Platform, ActivityIndicator, Alert, Dimensions, TextInput,
+  KeyboardAvoidingView, Modal, FlatList
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,6 +12,7 @@ import {
 } from 'lucide-react-native';
 import * as Contacts from 'expo-contacts';
 import { colors } from '../theme/colors';
+import ExpenseActionModal from '../components/ExpenseActionModal';
 import { api } from '../api/client';
 import { useAuth } from '../store/useAuth';
 
@@ -45,6 +47,27 @@ export default function DashboardScreen({ navigation }) {
   const [nativeContacts, setNativeContacts] = useState([]);
   const [contactSearch, setContactSearch] = useState('');
   const [loadingContacts, setLoadingContacts] = useState(false);
+
+  // Friend Details State
+  const [selectedFriendForDetails, setSelectedFriendForDetails] = useState(null);
+  const [friendExpenses, setFriendExpenses] = useState([]);
+
+  // Expense Action Modal State
+  const [selectedExpenseForAction, setSelectedExpenseForAction] = useState(null);
+
+  const handleFriendClick = (friend) => {
+    setSelectedFriendForDetails(friend);
+    const filtered = expenses.filter(e => e.with_user === friend.name);
+    setFriendExpenses(filtered);
+  };
+
+  const refreshExpenses = async () => {
+    try {
+      const expRes = await api.get('/expenses');
+      const list = expRes.data.expenses ?? (Array.isArray(expRes.data) ? expRes.data : []);
+      setExpenses(list);
+    } catch (e) { console.warn('refresh failed', e); }
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -357,7 +380,12 @@ export default function DashboardScreen({ navigation }) {
               {udhaarList.map((friend) => {
                 const isOwed = friend.net > 0;
                 return (
-                  <View key={friend.userId} style={styles.udhaarCard}>
+                  <TouchableOpacity 
+                    key={friend.userId} 
+                    style={styles.udhaarCard}
+                    activeOpacity={0.7}
+                    onPress={() => handleFriendClick(friend)}
+                  >
                     <View style={styles.udhaarAvatar}>
                       <Text style={styles.udhaarInitials}>{friend.name.charAt(0).toUpperCase()}</Text>
                     </View>
@@ -367,7 +395,7 @@ export default function DashboardScreen({ navigation }) {
                         {isOwed ? '+' : '-'}₹{Math.abs(friend.net).toFixed(0)}
                       </Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </ScrollView>
@@ -436,19 +464,31 @@ export default function DashboardScreen({ navigation }) {
               const isToday = expense.date?.slice(0, 10) === today;
               const expDate = new Date(expense.date);
               const icon = CATEGORY_ICONS[expense.categoryId] || '💸';
+              const isUdhaarMila = expense.categoryId === 'udhaar' && expense.note === 'Udhaar Mila';
+              const isUdhaarDiya = expense.categoryId === 'udhaar' && expense.note === 'Udhaar Diya';
+              const amountColor = isUdhaarMila ? '#10B981' : '#EF4444';
+              const amountPrefix = isUdhaarMila ? '+' : '−';
               return (
-                <View key={expense.id} style={styles.txRow}>
+                <TouchableOpacity 
+                  key={expense.id} 
+                  style={styles.txRow}
+                  activeOpacity={0.7}
+                  onPress={() => setSelectedExpenseForAction(expense)}
+                >
                   <View style={styles.txIconBg}>
                     <Text style={{ fontSize: 18 }}>{icon}</Text>
                   </View>
                   <View style={styles.txInfo}>
-                    <Text style={styles.txTitle}>{expense.note || expense.categoryId || 'Expense'}</Text>
+                    <Text style={styles.txTitle}>
+                      {expense.note || expense.categoryId || 'Expense'}
+                      {expense.with_user ? ` • ${expense.with_user}` : ''}
+                    </Text>
                     <Text style={styles.txDate}>
                       {isToday ? 'Today' : expDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
                     </Text>
                   </View>
-                  <Text style={styles.txAmount}>−₹{parseFloat(expense.amount).toFixed(0)}</Text>
-                </View>
+                  <Text style={[styles.txAmount, { color: amountColor }]}>{amountPrefix}₹{parseFloat(expense.amount).toFixed(0)}</Text>
+                </TouchableOpacity>
               );
             })
           )}
@@ -459,7 +499,10 @@ export default function DashboardScreen({ navigation }) {
 
       {/* ── Quick Udhaar Modal ───────────────────────── */}
       {showUdhaarModal && (
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView 
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Quick Udhaar</Text>
@@ -544,12 +587,15 @@ export default function DashboardScreen({ navigation }) {
               {isSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalSubmitText}>Save Udhaar</Text>}
             </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       )}
 
       {/* ── Add Contact Modal ───────────────────────── */}
       {showAddContactModal && (
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView 
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
           <View style={[styles.modalContent, { flex: 0.9 }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Add Friend</Text>
@@ -634,8 +680,65 @@ export default function DashboardScreen({ navigation }) {
               </ScrollView>
             )}
           </View>
-        </View>
+        </KeyboardAvoidingView>
       )}
+
+      {/* ── Friend Details Modal ───────────────────────── */}
+      <Modal 
+        visible={!!selectedFriendForDetails} 
+        animationType="slide" 
+        presentationStyle="pageSheet"
+        onRequestClose={() => setSelectedFriendForDetails(null)}
+      >
+        <SafeAreaView style={styles.modalSafe}>
+          <View style={styles.modalHeader}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={{ fontSize: 24 }}>👤</Text>
+              <Text style={styles.modalTitle}>{selectedFriendForDetails?.name}'s Details</Text>
+            </View>
+            <TouchableOpacity onPress={() => setSelectedFriendForDetails(null)}>
+              <Text style={styles.modalCancel}>Close</Text>
+            </TouchableOpacity>
+          </View>
+
+          {friendExpenses.length === 0 ? (
+            <Text style={[styles.emptyText, { marginTop: 40 }]}>No recent transactions found with this friend.</Text>
+          ) : (
+            <FlatList
+              data={friendExpenses}
+              keyExtractor={(item, index) => `${item.id}-${index}`}
+              contentContainerStyle={styles.detailsList}
+              renderItem={({ item }) => {
+                const isUM = item.categoryId === 'udhaar' && item.note === 'Udhaar Mila';
+                const isUD = item.categoryId === 'udhaar' && item.note === 'Udhaar Diya';
+                const ac = isUM ? '#10B981' : '#EF4444';
+                const ap = isUM ? '+' : '−';
+                return (
+                  <TouchableOpacity 
+                    style={styles.detailRow}
+                    activeOpacity={0.7}
+                    onPress={() => setSelectedExpenseForAction(item)}
+                  >
+                    <View style={styles.detailInfo}>
+                      <Text style={styles.detailTitle} numberOfLines={1}>{item.note || item.categoryId || 'Expense'}</Text>
+                      <Text style={styles.detailDate}>{new Date(item.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} • {item.type}</Text>
+                    </View>
+                    <Text style={[styles.detailAmount, { color: ac }]}>{ap}₹{parseFloat(item.amount).toFixed(0)}</Text>
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          )}
+        </SafeAreaView>
+      </Modal>
+
+      {/* ── Expense Action Modal ───────────────────────── */}
+      <ExpenseActionModal
+        visible={!!selectedExpenseForAction}
+        expense={selectedExpenseForAction}
+        onClose={() => setSelectedExpenseForAction(null)}
+        onRefresh={refreshExpenses}
+      />
     </SafeAreaView>
   );
 }
@@ -839,4 +942,13 @@ const styles = StyleSheet.create({
   contactInfo: { flex: 1 },
   contactName: { fontSize: 15, fontWeight: '600', color: '#1E2340', marginBottom: 4 },
   contactPhone: { fontSize: 13, color: '#718096' },
+
+  // Details Modal Styles
+  modalSafe: { flex: 1, backgroundColor: '#F8F9FF' },
+  detailsList: { padding: 20 },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', padding: 16, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: '#EAECF5' },
+  detailInfo: { flex: 1, paddingRight: 16 },
+  detailTitle: { fontSize: 16, fontWeight: '700', color: '#1E2340', marginBottom: 4 },
+  detailDate: { fontSize: 13, color: '#718096', textTransform: 'capitalize' },
+  detailAmount: { fontSize: 18, fontWeight: '800', color: '#EF4444' }
 });
