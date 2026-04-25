@@ -3,7 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import { Home, Users, PieChart, Receipt, User, CreditCard } from 'lucide-react-native';
+import { Home, Users, PieChart, GitFork } from 'lucide-react-native';
 
 import DashboardScreen from './src/screens/DashboardScreen';
 import GroupsScreen from './src/screens/GroupsScreen';
@@ -25,6 +25,57 @@ import React, { useEffect } from 'react';
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
+// ─── SmartSplit nested tab navigator ────────────────────────────────────────
+function SmartSplitTabs() {
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: {
+          backgroundColor: '#FFFFFF',
+          borderTopWidth: 1,
+          borderTopColor: colors.borderLight,
+          height: 56,
+          paddingBottom: 8,
+          paddingTop: 8,
+          elevation: 0,
+          shadowOpacity: 0,
+        },
+        tabBarActiveTintColor: '#5A67D8',
+        tabBarInactiveTintColor: colors.textMuted,
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '600', marginTop: 2 },
+      }}
+    >
+      <Tab.Screen
+        name="Groups"
+        component={GroupsScreen}
+        options={{
+          tabBarIcon: ({ color }) => <Users color={color} size={22} />,
+        }}
+      />
+      <Tab.Screen
+        name="Bills"
+        component={BillsScreen}
+        options={{
+          tabBarIcon: ({ color }) => (
+            <PieChart color={color} size={22} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Balances"
+        component={BalancesScreen}
+        options={{
+          tabBarIcon: ({ color }) => (
+            <GitFork color={color} size={22} />
+          ),
+        }}
+      />
+    </Tab.Navigator>
+  );
+}
+
+// ─── Main bottom tab navigator ───────────────────────────────────────────────
 function BottomTabs() {
   return (
     <Tab.Navigator
@@ -42,52 +93,36 @@ function BottomTabs() {
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: '600',
-          marginTop: 4,
-        },
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '600', marginTop: 4 },
       }}
     >
-      <Tab.Screen 
-        name="Home" 
-        component={DashboardScreen} 
+      <Tab.Screen
+        name="Home"
+        component={DashboardScreen}
         options={{
-          tabBarIcon: ({ color, size }) => <Home color={color} size={22} />
+          tabBarIcon: ({ color }) => <Home color={color} size={22} />,
         }}
       />
-      <Tab.Screen 
-        name="Groups" 
-        component={GroupsScreen} 
+      <Tab.Screen
+        name="SmartSplit"
+        component={SmartSplitTabs}
         options={{
-          tabBarIcon: ({ color, size }) => <Users color={color} size={22} />
+          tabBarIcon: ({ color }) => <Users color={color} size={22} />,
+          tabBarLabel: 'SmartSplit',
         }}
       />
-      <Tab.Screen 
-        name="Analytics" 
-        component={AnalyticsScreen} 
+      <Tab.Screen
+        name="Analytics"
+        component={AnalyticsScreen}
         options={{
-          tabBarIcon: ({ color, size }) => <PieChart color={color} size={22} />
-        }}
-      />
-      <Tab.Screen 
-        name="Bills" 
-        component={BillsScreen} 
-        options={{
-          tabBarIcon: ({ color, size }) => <Receipt color={color} size={22} />
-        }}
-      />
-      <Tab.Screen 
-        name="Balances" 
-        component={BalancesScreen} 
-        options={{
-          tabBarIcon: ({ color, size }) => <CreditCard color={color} size={22} />
+          tabBarIcon: ({ color }) => <PieChart color={color} size={22} />,
         }}
       />
     </Tab.Navigator>
   );
 }
 
+// ─── Root App ────────────────────────────────────────────────────────────────
 export default function App() {
   const { token, initAuth, isLoading } = useAuth();
 
@@ -96,7 +131,7 @@ export default function App() {
   }, [initAuth]);
 
   if (isLoading) {
-    return null; // A proper splash screen could go here
+    return null;
   }
 
   return (
