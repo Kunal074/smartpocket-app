@@ -10,10 +10,20 @@ export default function BillsScreen({ navigation }) {
   const [activeTopTab, setActiveTopTab] = useState('Expenses');
   const [activeSideTab, setActiveSideTab] = useState('Non Group');
   const [groups, setGroups] = useState([]);
+  const [bills, setBills] = useState([]);
+  const [loadingBills, setLoadingBills] = useState(false);
 
   useEffect(() => {
     fetchGroups();
   }, []);
+
+  useEffect(() => {
+    if (activeSideTab === 'Non Group') {
+      fetchPersonalBills();
+    } else if (activeSideTab !== 'Recent') {
+      fetchGroupBills(activeSideTab);
+    }
+  }, [activeSideTab]);
 
   const fetchGroups = async () => {
     try {
@@ -21,6 +31,30 @@ export default function BillsScreen({ navigation }) {
       setGroups(response.data);
     } catch (e) {
       console.warn('Failed to fetch groups for Bills sidebar', e);
+    }
+  };
+
+  const fetchPersonalBills = async () => {
+    setLoadingBills(true);
+    try {
+      const res = await api.get('/bills');
+      setBills(res.data);
+    } catch (e) {
+      setBills([]);
+    } finally {
+      setLoadingBills(false);
+    }
+  };
+
+  const fetchGroupBills = async (groupId) => {
+    setLoadingBills(true);
+    try {
+      const res = await api.get(`/groups/${groupId}/expenses`);
+      setBills(res.data);
+    } catch (e) {
+      setBills([]);
+    } finally {
+      setLoadingBills(false);
     }
   };
 
