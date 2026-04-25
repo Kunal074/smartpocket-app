@@ -10,42 +10,46 @@ import { useAuth } from '../store/useAuth';
 export default function DashboardScreen({ navigation }) {
   const { user, logout } = useAuth();
   const [expenses, setExpenses] = useState([]);
+  const [youGet, setYouGet] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
 
-      const fetchExpenses = async () => {
+      const fetchData = async () => {
         try {
-          const { data } = await api.get('/expenses');
+          const [expRes, balRes] = await Promise.all([
+            api.get('/expenses'),
+            api.get('/balances').catch(() => ({ data: { owedToYou: 0 } })),
+          ]);
           if (isActive) {
-            // Backend returns { expenses: [...] }
-            const list = data.expenses ?? (Array.isArray(data) ? data : []);
+            const list = expRes.data.expenses ?? (Array.isArray(expRes.data) ? expRes.data : []);
             setExpenses(list);
+            setYouGet(balRes.data.owedToYou || 0);
           }
         } catch (error) {
           if (error.response?.status === 401 && isActive) {
             logout();
           } else if (isActive) {
-            console.warn("Failed to fetch expenses:", error.message);
+            console.warn('Failed to fetch dashboard data:', error.message);
           }
         } finally {
           if (isActive) setIsLoading(false);
         }
       };
 
-      fetchExpenses();
+      fetchData();
 
-      return () => {
-        isActive = false;
-      };
+      return () => { isActive = false; };
     }, [logout])
   );
 
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
   const month = now.toISOString().slice(0, 7);
+  const hour = now.getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
   const todaySpend = expenses
     .filter(e => e.date?.slice(0, 10) === today)
@@ -59,7 +63,6 @@ export default function DashboardScreen({ navigation }) {
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 5);
 
-  const youGet = 0; // We will fetch this from settlements later
   const firstName = user?.name?.split(' ')[0] || 'there';
 
   const handleProfilePress = () => {
@@ -89,7 +92,7 @@ export default function DashboardScreen({ navigation }) {
         {/* Header / Greeting */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Good evening \uD83D\uDC4B</Text>
+            <Text style={styles.greeting}>{greeting} 👋</Text>
             <Text style={styles.name}>{firstName}</Text>
           </View>
           <TouchableOpacity style={styles.profileBtn} onPress={handleProfilePress}>

@@ -65,6 +65,23 @@ export default function GroupsScreen({ navigation }) {
     fetchContacts();
   };
 
+  const handleQuickAdd = async (item) => {
+    try {
+      const res = await api.get(`/groups/${item.id}/members`);
+      navigation.navigate('GroupAddExpense', {
+        groupId: item.id,
+        groupName: item.name,
+        members: res.data,
+      });
+    } catch (e) {
+      navigation.navigate('GroupAddExpense', {
+        groupId: item.id,
+        groupName: item.name,
+        members: [],
+      });
+    }
+  };
+
   const renderGroupCard = ({ item }) => {
     const netBalance = parseFloat(item.net_balance || 0);
     const isOwed = netBalance > 0;
