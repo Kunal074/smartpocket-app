@@ -18,7 +18,7 @@ import { useAuth } from '../store/useAuth';
  *  - onClose: () => void
  *  - onRefresh: () => void  (called after edit/delete/comment to reload data)
  */
-export default function ExpenseActionModal({ visible, expense, onClose, onRefresh }) {
+export default function ExpenseActionModal({ visible, expense, onClose, onRefresh, isHistoryView }) {
   const [mode, setMode] = useState('menu'); // 'menu' | 'edit' | 'comment'
   const [editNote, setEditNote] = useState('');
   const [editAmount, setEditAmount] = useState('');
@@ -166,12 +166,14 @@ export default function ExpenseActionModal({ visible, expense, onClose, onRefres
           <View style={styles.actionsRow}>
             {canEdit ? (
               <>
-                <TouchableOpacity style={styles.actionBtn} onPress={() => handleOpen('edit')}>
-                  <View style={[styles.actionIcon, { backgroundColor: '#EEF2FF' }]}>
-                    <Pencil color="#5A67D8" size={20} />
-                  </View>
-                  <Text style={styles.actionLabel}>Edit</Text>
-                </TouchableOpacity>
+                {!isHistoryView && (
+                  <TouchableOpacity style={styles.actionBtn} onPress={() => handleOpen('edit')}>
+                    <View style={[styles.actionIcon, { backgroundColor: '#EEF2FF' }]}>
+                      <Pencil color="#5A67D8" size={20} />
+                    </View>
+                    <Text style={styles.actionLabel}>Edit</Text>
+                  </TouchableOpacity>
+                )}
 
                 <TouchableOpacity style={styles.actionBtn} onPress={() => handleOpen('comment')}>
                   <View style={[styles.actionIcon, { backgroundColor: '#F0FDF4' }]}>

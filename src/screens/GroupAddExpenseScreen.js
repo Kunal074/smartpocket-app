@@ -65,9 +65,7 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
     return initialMembers.reduce((acc, m) => ({ ...acc, [m.user_id]: '1' }), {});
   });
   
-  const [editedAmounts, setEditedAmounts] = useState(new Set(
-    editMode && expense?.split_type === 'custom' ? splits.map(s => s.user_id) : []
-  ));
+  const [editedAmounts, setEditedAmounts] = useState(new Set());
 
   // Add Member Modal State
   const [showAddMember, setShowAddMember] = useState(false);
@@ -349,7 +347,7 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
             <View style={styles.billBadge}>
               <Text style={styles.billBadgeText}>Bill 1</Text>
             </View>
-            <TouchableOpacity style={styles.addBillBtn}>
+            <TouchableOpacity style={styles.addBillBtn} onPress={() => Alert.alert('Coming Soon', 'Adding multiple bills at once is coming in a future update!')}>
               <Plus color={colors.primary} size={16} />
               <Text style={styles.addBillText}>Add bill</Text>
             </TouchableOpacity>

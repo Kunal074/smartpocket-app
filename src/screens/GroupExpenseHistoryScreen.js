@@ -7,11 +7,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import { ChevronLeft, History, FileText } from 'lucide-react-native';
 import { api } from '../api/client';
 import { colors } from '../theme/colors';
+import ExpenseActionModal from '../components/ExpenseActionModal';
 
 export default function GroupExpenseHistoryScreen({ route, navigation }) {
   const { groupId, groupName } = route.params;
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedExpense, setSelectedExpense] = useState(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -38,7 +40,10 @@ export default function GroupExpenseHistoryScreen({ route, navigation }) {
 
   const renderItem = ({ item }) => {
     return (
-      <View style={styles.historyCard}>
+      <TouchableOpacity 
+        style={styles.historyCard} 
+        onPress={() => setSelectedExpense(item)}
+      >
         <View style={styles.cardHeader}>
           <View style={styles.iconBox}>
             <FileText color="#5A67D8" size={18} />
@@ -50,9 +55,9 @@ export default function GroupExpenseHistoryScreen({ route, navigation }) {
         </View>
         <View style={styles.detailsArea}>
           <Text style={styles.changesText}>{item.changes_summary}</Text>
-          <Text style={styles.timeText}>{formatTime(item.created_at)}</Text>
+          <Text style={styles.timeText}>{formatTime(item.edit_time)}</Text>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -73,7 +78,7 @@ export default function GroupExpenseHistoryScreen({ route, navigation }) {
       ) : (
         <FlatList
           data={history}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.history_id}
           contentContainerStyle={styles.listContent}
           renderItem={renderItem}
           ListEmptyComponent={
@@ -83,6 +88,16 @@ export default function GroupExpenseHistoryScreen({ route, navigation }) {
               <Text style={styles.emptySub}>All updates to expenses will appear here.</Text>
             </View>
           }
+        />
+      )}
+
+      {selectedExpense && (
+        <ExpenseActionModal
+          expense={selectedExpense}
+          visible={!!selectedExpense}
+          onClose={() => setSelectedExpense(null)}
+          onRefresh={() => {}} // History screen doesn't need to refresh its list just because of a comment, but we can provide empty func
+          isHistoryView={true}
         />
       )}
     </SafeAreaView>
