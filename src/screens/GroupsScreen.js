@@ -87,7 +87,7 @@ export default function GroupsScreen({ navigation }) {
     const isOwed = netBalance > 0;
     const isOwing = netBalance < 0;
     const balanceColor = isOwed ? '#10B981' : isOwing ? colors.danger : colors.textSecondary;
-    const balanceText = isOwed ? 'You are owed' : isOwing ? 'You owe' : 'Settled up';
+    const balanceText = isOwed ? 'Aapko milega' : isOwing ? 'Aapko dena hai' : 'Settled up';
     const amountText = netBalance !== 0 ? `₹${Math.abs(netBalance).toFixed(0)}` : '';
 
     const getIcon = () => {
@@ -122,7 +122,7 @@ export default function GroupsScreen({ navigation }) {
         <View style={styles.cardFooter}>
           {netBalance !== 0 ? (
             <Text style={[styles.settlementText, { color: balanceColor }]}>
-              {isOwed ? `The group pays you ${amountText}` : `You pay the group ${amountText}`}
+              {isOwed ? `Group se milega ${amountText}` : `Group ko dena hai ${amountText}`}
             </Text>
           ) : (
             <Text style={styles.settlementText}>No outstanding balances</Text>

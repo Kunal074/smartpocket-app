@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, Platform,
   FlatList, TouchableOpacity, ActivityIndicator, Modal, TextInput,
-  Image, Share, Alert
+  Image, Share, Alert, ScrollView
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { ChevronLeft, ChevronDown, Share2, Download, MessageSquare, Settings, Search, Plus, History } from 'lucide-react-native';
@@ -18,17 +18,29 @@ const CATEGORIES = [
 ];
 
 export default function GroupDetailScreen({ route, navigation }) {
-  const { groupId, groupName } = route.params;
+  const { groupId, groupName: routeGroupName } = route.params;
   const { user } = useAuth();
   
   const [group, setGroup] = useState(null);
   const [expenses, setExpenses] = useState([]);
   const [balances, setBalances] = useState([]);
+  const [netBalances, setNetBalances] = useState([]);
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('expense'); // expense, summary, balance
+  const [summaryView, setSummaryView] = useState('category'); // category, mySpending, totalSpending
+  const [summaryToggle, setSummaryToggle] = useState('your'); // your, group
+  const [simplifyOn, setSimplifyOn] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Settle Up Modal
+  const [settleModal, setSettleModal] = useState(null); // { from, to, amount }
+  const [settleAmount, setSettleAmount] = useState('');
+  const [settling, setSettling] = useState(false);
+
+  // Balance Detail Modal
+  const [balanceDetail, setBalanceDetail] = useState(null); // { from, to, amount, expenseBreakdown }
 
   // Add Member Modal
   const [showAddMember, setShowAddMember] = useState(false);
@@ -55,6 +67,7 @@ export default function GroupDetailScreen({ route, navigation }) {
           const expList = Array.isArray(expRes.data) ? expRes.data : (expRes.data.expenses ?? []);
           setExpenses(expList);
           setBalances(balRes.data?.simplifiedDebts ?? []);
+          setNetBalances(balRes.data?.netBalances ?? []);
           setMembers(Array.isArray(memRes.data) ? memRes.data : []);
         } catch (e) {
           console.warn('GroupDetail fetch error:', e.message);
@@ -145,6 +158,61 @@ export default function GroupDetailScreen({ route, navigation }) {
 
   const filteredExpenses = expenses.filter(e => e.title?.toLowerCase().includes(searchQuery.toLowerCase()) || e.note?.toLowerCase().includes(searchQuery.toLowerCase()));
 
+  const handleRemind = async (b) => {
+    try {
+      const msg = `🔔 Reminder: ${b.from?.name} owes ₹${parseFloat(b.amount).toFixed(0)} to ${b.to?.name}. Please settle up!`;
+      await api.post(`/group-messages/${groupId}`, { message: msg });
+      Alert.alert('Reminder Sent!', 'A reminder has been posted to the group chat.');
+    } catch (e) {
+      Alert.alert('Error', 'Could not send reminder. Try again.');
+    }
+  };
+
+  const handleSettleUp = (b) => {
+    setSettleAmount(parseFloat(b.amount).toFixed(0));
+    setSettleModal(b);
+  };
+
+  const openBalanceDetail = (b) => {
+    // Find all expenses involving both people
+    const fromId = b.from?.id;
+    const toId = b.to?.id;
+    const relatedExpenses = expenses.filter(exp => {
+      const splits = exp.splits || [];
+      const fromSplit = splits.find(s => s.user_id === fromId);
+      const toSplit = splits.find(s => s.user_id === toId);
+      // Expense is relevant if both are in splits OR one paid and the other is in splits
+      const paidBy = exp.paid_by;
+      const bothInSplits = fromSplit && toSplit;
+      const fromPaidToOwes = paidBy === toId && fromSplit;
+      const toPaidFromOwes = paidBy === fromId && toSplit;
+      return bothInSplits || fromPaidToOwes || toPaidFromOwes;
+    });
+    setBalanceDetail({ ...b, relatedExpenses });
+  };
+
+  const confirmSettle = async () => {
+    if (!settleAmount || isNaN(settleAmount) || parseFloat(settleAmount) <= 0) {
+      Alert.alert('Error', 'Enter a valid amount');
+      return;
+    }
+    setSettling(true);
+    try {
+      await api.post(`/groups/${groupId}/settlements`, {
+        paid_by: settleModal.from?.id,
+        paid_to: settleModal.to?.id,
+        amount: parseFloat(settleAmount),
+      });
+      setSettleModal(null);
+      setReloadKey(k => k + 1);
+      Alert.alert('✅ Settled!', `Payment of \u20b9${settleAmount} recorded successfully.`);
+    } catch (e) {
+      Alert.alert('Error', e.response?.data?.error || 'Failed to record settlement');
+    } finally {
+      setSettling(false);
+    }
+  };
+
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
       <Text style={styles.emptyTitle}>No expenses yet</Text>
@@ -174,6 +242,36 @@ export default function GroupDetailScreen({ route, navigation }) {
 
   const myBalances = balances.filter(b => b.from?.id === user?.id || b.to?.id === user?.id);
   const otherBalances = balances.filter(b => b.from?.id !== user?.id && b.to?.id !== user?.id);
+
+  // --- Summary Tab Computed Data ---
+  const groupName = group?.name || routeGroupName;
+  const CATEGORY_COLORS = {
+    food: '#FFD166', transport: '#06D6A0', shopping: '#EF476F',
+    bills: '#118AB2', entertainment: '#8338EC', other: '#5A67D8'
+  };
+  const CATEGORY_ICONS = {
+    food: '🍔', transport: '🚕', shopping: '🛍️',
+    bills: '📄', entertainment: '🎬', other: '💸'
+  };
+
+  // Category-wise spending
+  const categoryTotals = expenses.reduce((acc, exp) => {
+    const cat = exp.category || 'other';
+    if (!acc[cat]) acc[cat] = { total: 0, myShare: 0, expenses: [] };
+    acc[cat].total += parseFloat(exp.amount) || 0;
+    // Find my split for this expense from splits data if available
+    const mySplit = exp.splits?.find(s => s.user_id === user?.id);
+    acc[cat].myShare += mySplit ? parseFloat(mySplit.amount) : 0;
+    acc[cat].expenses.push(exp);
+    return acc;
+  }, {});
+  const categoryList = Object.entries(categoryTotals)
+    .map(([cat, data]) => ({ cat, ...data }))
+    .sort((a, b) => b.total - a.total);
+
+  const groupTotal = expenses.reduce((s, e) => s + parseFloat(e.amount || 0), 0);
+  const myTotal = categoryList.reduce((s, c) => s + c.myShare, 0);
+  const displayTotal = summaryToggle === 'your' ? myTotal : groupTotal;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -282,13 +380,18 @@ export default function GroupDetailScreen({ route, navigation }) {
                     {myBalances.map(b => {
                       const iOwe = b.from?.id === user?.id;
                       return (
-                        <View key={b.from.id + '-' + b.to.id} style={styles.settlementCard}>
+                        <TouchableOpacity
+                          key={b.from.id + '-' + b.to.id}
+                          style={styles.settlementCard}
+                          onPress={() => openBalanceDetail(b)}
+                          activeOpacity={0.85}
+                        >
                           <View style={styles.settlementFlow}>
                             <View style={{ alignItems: 'center' }}>
                               <View style={styles.settleAvatar}>
                                 <Text style={styles.settleAvatarText}>{b.from?.name?.charAt(0) || '?'}</Text>
                               </View>
-                              <Text style={styles.settleName}>{b.from?.name}</Text>
+                              <Text style={styles.settleName}>{iOwe ? 'Aap' : b.from?.name}</Text>
                               {b.from?.role === 'admin' && <Text style={styles.adminBadge}>Admin</Text>}
                             </View>
 
@@ -296,7 +399,7 @@ export default function GroupDetailScreen({ route, navigation }) {
                               <Text style={styles.settleArrowLine}>──────</Text>
                               <View style={styles.settleArrowInfo}>
                                 <Text style={[styles.settleArrowAmount, { color: '#10B981' }]}>₹{parseFloat(b.amount).toFixed(0)}</Text>
-                                <Text style={styles.settleArrowSub}>will pay</Text>
+                                <Text style={styles.settleArrowSub}>{iOwe ? 'dena hai 👉' : 'milega 💰'}</Text>
                               </View>
                               <Text style={styles.settleArrowHead}>→</Text>
                             </View>
@@ -310,32 +413,35 @@ export default function GroupDetailScreen({ route, navigation }) {
                             </View>
 
                             <View style={styles.settleActions}>
-                              <TouchableOpacity style={styles.remindBtn} onPress={() => Alert.alert('Coming Soon', 'Reminders will be sent automatically.')}>
+                              <TouchableOpacity style={styles.remindBtn} onPress={(e) => { e.stopPropagation?.(); handleRemind(b); }}>
                                 <Text style={styles.remindBtnText}>Remind</Text>
                               </TouchableOpacity>
-                              <TouchableOpacity style={styles.settleUpBtn} onPress={() => Alert.alert('Coming Soon', 'In-app payments are coming soon!')}>
+                              <TouchableOpacity style={styles.settleUpBtn} onPress={(e) => { e.stopPropagation?.(); handleSettleUp(b); }}>
                                 <Text style={styles.settleUpBtnText}>Settle Up</Text>
                               </TouchableOpacity>
                             </View>
                           </View>
-                        </View>
+                          <Text style={styles.balanceTapHint}>👆 Details ke liye tap karo</Text>
+                        </TouchableOpacity>
                       );
                     })}
                   </View>
 
                   {/* Simplify Balance Toggle */}
                   <View style={styles.simplifyCard}>
-                    <View style={styles.simplifyHeaderRow}>
-                      <Text style={styles.simplifyTitle}>Simplify balance is turned off</Text>
-                      <View style={styles.toggleTrack}>
-                        <View style={styles.toggleThumb} />
+                    <TouchableOpacity style={styles.simplifyHeaderRow} onPress={() => setSimplifyOn(v => !v)}>
+                      <Text style={styles.simplifyTitle}>
+                        {simplifyOn ? 'Simplify balance is ON' : 'Simplify balance is OFF'}
+                      </Text>
+                      <View style={[styles.toggleTrack, simplifyOn && styles.toggleTrackOn]}>
+                        <View style={[styles.toggleThumb, simplifyOn && styles.toggleThumbOn]} />
                       </View>
-                    </View>
-                    <Text style={styles.simplifyDesc}>We simplify your balances in a group to reduce the number of payments. It doesn't change anyone's total balance.</Text>
-                    <TouchableOpacity style={styles.simplifyLinkRow}>
-                      <Text style={styles.simplifyLink}>How it works?</Text>
-                      <ChevronDown color={colors.textSecondary} size={16} />
                     </TouchableOpacity>
+                    <Text style={styles.simplifyDesc}>
+                      {simplifyOn
+                        ? 'Balances are simplified to reduce the number of payments. It doesn\'t change anyone\'s total balance.'
+                        : 'Turn on to simplify debts and reduce the number of payments needed.'}
+                    </Text>
                   </View>
 
                   <TouchableOpacity style={styles.reportBtn}>
@@ -353,74 +459,129 @@ export default function GroupDetailScreen({ route, navigation }) {
                 <View style={styles.summaryLayout}>
                   {/* Left Sidebar */}
                   <View style={styles.summarySidebar}>
-                    <TouchableOpacity style={styles.sidebarBtnActive}>
-                      <Text style={styles.sidebarTextActive}>Category Wise</Text>
+                    <TouchableOpacity
+                      style={summaryView === 'category' ? styles.sidebarBtnActive : styles.sidebarBtn}
+                      onPress={() => setSummaryView('category')}
+                    >
+                      <Text style={summaryView === 'category' ? styles.sidebarTextActive : styles.sidebarText}>Category Wise</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.sidebarBtn}>
-                      <Text style={styles.sidebarText}>Your Spending</Text>
+                    <TouchableOpacity
+                      style={summaryView === 'mySpending' ? styles.sidebarBtnActive : styles.sidebarBtn}
+                      onPress={() => setSummaryView('mySpending')}
+                    >
+                      <Text style={summaryView === 'mySpending' ? styles.sidebarTextActive : styles.sidebarText}>Your Spending</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.sidebarBtn}>
-                      <Text style={styles.sidebarText}>Total Spending</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.sidebarBtn}>
-                      <Text style={styles.sidebarText}>Others' Spending</Text>
+                    <TouchableOpacity
+                      style={summaryView === 'totalSpending' ? styles.sidebarBtnActive : styles.sidebarBtn}
+                      onPress={() => setSummaryView('totalSpending')}
+                    >
+                      <Text style={summaryView === 'totalSpending' ? styles.sidebarTextActive : styles.sidebarText}>Total Spending</Text>
                     </TouchableOpacity>
                   </View>
 
                   {/* Main Summary Content */}
                   <View style={styles.summaryMain}>
-                    <View style={styles.summaryHeaderCard}>
-                      <View style={styles.summaryHeaderTopRow}>
-                        <Text style={styles.summaryHeaderTitle}>Category-wise Summary</Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                          <Text style={styles.summaryFilterText}>This Month</Text>
-                          <View style={styles.filterIconBg}>
-                            <Text style={styles.filterIcon}>▼</Text>
+                    {/* --- CATEGORY WISE VIEW --- */}
+                    {summaryView === 'category' && (
+                      <View style={styles.summaryHeaderCard}>
+                        <View style={styles.summaryHeaderTopRow}>
+                          <Text style={styles.summaryHeaderTitle}>Category-wise</Text>
+                        </View>
+
+                        {/* Toggle Your / Group */}
+                        <View style={styles.summaryToggleContainer}>
+                          <TouchableOpacity
+                            style={summaryToggle === 'your' ? styles.summaryToggleBtnActive : styles.summaryToggleBtn}
+                            onPress={() => setSummaryToggle('your')}
+                          >
+                            <Text style={summaryToggle === 'your' ? styles.summaryToggleTextActive : styles.summaryToggleText}>Your</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={summaryToggle === 'group' ? styles.summaryToggleBtnActive : styles.summaryToggleBtn}
+                            onPress={() => setSummaryToggle('group')}
+                          >
+                            <Text style={summaryToggle === 'group' ? styles.summaryToggleTextActive : styles.summaryToggleText}>Group</Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        {/* Total Amount */}
+                        <View style={styles.donutContainer}>
+                          <View style={styles.donutOuterRing}>
+                            <View style={styles.donutInnerHole}>
+                              <Text style={styles.donutCenterLabel}>{summaryToggle === 'your' ? 'Your Share' : 'Group Total'}</Text>
+                              <Text style={styles.donutCenterText}>₹{displayTotal.toFixed(0)}</Text>
+                            </View>
                           </View>
                         </View>
-                      </View>
 
-                      {/* Toggle */}
-                      <View style={styles.summaryToggleContainer}>
-                        <TouchableOpacity style={styles.summaryToggleBtnActive}>
-                          <Text style={styles.summaryToggleTextActive}>Your</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.summaryToggleBtn}>
-                          <Text style={styles.summaryToggleText}>Group</Text>
-                        </TouchableOpacity>
+                        {/* Category Legend + amounts */}
+                        {categoryList.length === 0 ? (
+                          <Text style={{ color: '#A0AEC0', textAlign: 'center', marginTop: 12 }}>No expenses yet</Text>
+                        ) : (
+                          categoryList.map(c => {
+                            const amt = summaryToggle === 'your' ? c.myShare : c.total;
+                            const pct = displayTotal > 0 ? ((amt / displayTotal) * 100).toFixed(0) : 0;
+                            return (
+                              <View key={c.cat} style={styles.legendRow}>
+                                <View style={[styles.legendDot, { backgroundColor: CATEGORY_COLORS[c.cat] || '#5A67D8' }]} />
+                                <Text style={styles.legendIcon}>{CATEGORY_ICONS[c.cat] || '💸'}</Text>
+                                <Text style={styles.legendText}>{c.cat.charAt(0).toUpperCase() + c.cat.slice(1)}</Text>
+                                <Text style={styles.legendPct}>{pct}%</Text>
+                                <Text style={styles.legendAmount}>₹{amt.toFixed(0)}</Text>
+                              </View>
+                            );
+                          })
+                        )}
                       </View>
+                    )}
 
-                      {/* Donut Chart Placeholder */}
-                      <View style={styles.donutContainer}>
-                        <View style={styles.donutOuterRing}>
-                          <View style={styles.donutInnerHole}>
-                            <Text style={styles.donutCenterText}>₹ 850</Text>
+                    {/* --- YOUR SPENDING VIEW --- */}
+                    {summaryView === 'mySpending' && (
+                      <View style={styles.summaryHeaderCard}>
+                        <Text style={styles.summaryHeaderTitle}>Your Spending</Text>
+                        <Text style={styles.spendingTotal}>₹{myTotal.toFixed(0)}</Text>
+                        {categoryList.map(c => c.myShare > 0 && (
+                          <View key={c.cat} style={styles.detailedSummaryCard}>
+                            <View style={styles.detailedSummaryTitleRow}>
+                              <Text style={styles.legendIcon}>{CATEGORY_ICONS[c.cat] || '💸'}</Text>
+                              <Text style={styles.detailedSummaryTitle}>{c.cat.charAt(0).toUpperCase() + c.cat.slice(1)}</Text>
+                              <Text style={styles.detailedSummaryTotal}>₹{c.myShare.toFixed(0)}</Text>
+                            </View>
+                            {c.expenses.map(exp => (
+                              <View key={exp.id} style={styles.detailedSummaryRow}>
+                                <Text style={styles.detailedSummaryDate}>{new Date(exp.date || exp.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</Text>
+                                <Text style={styles.detailedSummaryCategory} numberOfLines={1}>{exp.title || exp.note}</Text>
+                                <Text style={styles.detailedSummaryAmount}>₹{parseFloat(exp.splits?.find(s => s.user_id === user?.id)?.amount || 0).toFixed(0)}</Text>
+                              </View>
+                            ))}
                           </View>
-                        </View>
+                        ))}
                       </View>
+                    )}
 
-                      {/* Category Legend */}
-                      <View style={styles.legendRow}>
-                        <View style={[styles.legendDot, { backgroundColor: '#FFD166' }]} />
-                        <Text style={styles.legendText}>Food</Text>
-                        <Text style={styles.legendAmount}>₹ 500</Text>
+                    {/* --- TOTAL SPENDING VIEW --- */}
+                    {summaryView === 'totalSpending' && (
+                      <View style={styles.summaryHeaderCard}>
+                        <Text style={styles.summaryHeaderTitle}>Total Group Spending</Text>
+                        <Text style={styles.spendingTotal}>₹{groupTotal.toFixed(0)}</Text>
+                        {categoryList.map(c => (
+                          <View key={c.cat} style={styles.detailedSummaryCard}>
+                            <View style={styles.detailedSummaryTitleRow}>
+                              <Text style={styles.legendIcon}>{CATEGORY_ICONS[c.cat] || '💸'}</Text>
+                              <Text style={styles.detailedSummaryTitle}>{c.cat.charAt(0).toUpperCase() + c.cat.slice(1)}</Text>
+                              <Text style={styles.detailedSummaryTotal}>₹{c.total.toFixed(0)}</Text>
+                            </View>
+                            {c.expenses.map(exp => (
+                              <View key={exp.id} style={styles.detailedSummaryRow}>
+                                <Text style={styles.detailedSummaryDate}>{new Date(exp.date || exp.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</Text>
+                                <Text style={styles.detailedSummaryCategory} numberOfLines={1}>{exp.title || exp.note}</Text>
+                                <Text style={styles.detailedSummaryAmount}>₹{parseFloat(exp.amount).toFixed(0)}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        ))}
                       </View>
-                      <View style={styles.legendRow}>
-                        <View style={[styles.legendDot, { backgroundColor: '#EF476F' }]} />
-                        <Text style={styles.legendText}>Transport</Text>
-                        <Text style={styles.legendAmount}>₹ 350</Text>
-                      </View>
-                    </View>
-
-                    {/* Detailed List */}
-                    <View style={styles.detailedSummaryCard}>
-                      <Text style={styles.detailedSummaryTitle}>Food</Text>
-                      <View style={styles.detailedSummaryRow}>
-                        <Text style={styles.detailedSummaryDate}>25 Apr</Text>
-                        <Text style={styles.detailedSummaryCategory}>Food</Text>
-                        <Text style={styles.detailedSummaryAmount}>₹500</Text>
-                      </View>
-                    </View>
+                    )}
                   </View>
                 </View>
               )}
@@ -447,20 +608,21 @@ export default function GroupDetailScreen({ route, navigation }) {
             }
             if (activeTab === 'balance') {
               return (
-                <View style={styles.otherBalanceCard}>
+                <TouchableOpacity style={styles.otherBalanceCard} onPress={() => openBalanceDetail(item)} activeOpacity={0.85}>
                   <View style={styles.otherBalanceLeft}>
                     <View style={styles.otherBalanceAvatar}>
                       <Text style={styles.otherBalanceAvatarText}>{item.from?.name?.charAt(0) || '?'}</Text>
                     </View>
-                    <Text style={styles.otherBalanceName}>{item.from?.name}</Text>
-                  </View>
-                  <View style={styles.otherBalanceRight}>
-                    <Text style={styles.otherBalanceOwes}>Owes <Text style={styles.otherBalanceAmount}>₹{parseFloat(item.amount).toFixed(0)}</Text></Text>
-                    <View style={styles.expandIconBgSmall}>
-                      <ChevronDown color={colors.textSecondary} size={14} />
+                    <View>
+                      <Text style={styles.otherBalanceName}>{item.from?.name}</Text>
+                      <Text style={styles.otherBalanceSubText}>{item.to?.name} ko dena hai</Text>
                     </View>
                   </View>
-                </View>
+                  <View style={styles.otherBalanceRight}>
+                    <Text style={styles.otherBalanceOwes}>₹<Text style={styles.otherBalanceAmount}>{parseFloat(item.amount).toFixed(0)}</Text></Text>
+                    <ChevronDown color={colors.textSecondary} size={14} />
+                  </View>
+                </TouchableOpacity>
               );
             }
             if (activeTab === 'summary') {
@@ -478,6 +640,93 @@ export default function GroupDetailScreen({ route, navigation }) {
           <Plus color={colors.surface} size={32} />
         </TouchableOpacity>
       )}
+
+      {/* Balance Detail Modal */}
+      <Modal visible={!!balanceDetail} transparent animationType="slide" onRequestClose={() => setBalanceDetail(null)}>
+        <TouchableOpacity style={styles.settleModalBackdrop} activeOpacity={1} onPress={() => setBalanceDetail(null)} />
+        <View style={[styles.settleModalSheet, { alignItems: 'flex-start', maxHeight: '80%' }]}>
+          <View style={{ alignSelf: 'center', width: 44, height: 5, borderRadius: 3, backgroundColor: '#E2E8F0', marginBottom: 16 }} />
+          <Text style={styles.settleModalTitle}>
+            {balanceDetail?.from?.id === user?.id ? 'Aap' : balanceDetail?.from?.name}
+            {' → '}
+            {balanceDetail?.to?.name}
+          </Text>
+          <Text style={[styles.settleModalSub, { marginBottom: 16 }]}>
+            {balanceDetail?.from?.id === user?.id ? 'Aapko' : (balanceDetail?.from?.name + ' ko')}{' '}
+            ₹{parseFloat(balanceDetail?.amount || 0).toFixed(0)} dena hai
+          </Text>
+
+          <Text style={{ fontSize: 13, fontWeight: '800', color: '#A0AEC0', textTransform: 'uppercase', marginBottom: 10, letterSpacing: 0.5 }}>In expenses se aara hai:</Text>
+
+          <ScrollView style={{ width: '100%' }} showsVerticalScrollIndicator={false}>
+            {(balanceDetail?.relatedExpenses || []).length === 0 ? (
+              <Text style={{ color: '#A0AEC0', textAlign: 'center', marginTop: 20 }}>Koi expense nahi mila</Text>
+            ) : (
+              (balanceDetail?.relatedExpenses || []).map(exp => {
+                const fromSplit = exp.splits?.find(s => s.user_id === balanceDetail?.from?.id);
+                const toSplit = exp.splits?.find(s => s.user_id === balanceDetail?.to?.id);
+                const expDate = new Date(exp.date || exp.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                return (
+                  <View key={exp.id} style={styles.bdExpenseRow}>
+                    <View style={styles.bdExpenseLeft}>
+                      <Text style={styles.bdExpenseTitle} numberOfLines={1}>{exp.title || exp.note || 'Expense'}</Text>
+                      <Text style={styles.bdExpenseDate}>{expDate} • Paid by {exp.paid_by_name}</Text>
+                    </View>
+                    <View style={styles.bdExpenseRight}>
+                      {fromSplit && <Text style={styles.bdSplitText}>{balanceDetail?.from?.id === user?.id ? 'Aapka' : balanceDetail?.from?.name + ' ka'}: ₹{parseFloat(fromSplit.amount).toFixed(0)}</Text>}
+                      {toSplit && <Text style={styles.bdSplitText}>{balanceDetail?.to?.name + ' ka'}: ₹{parseFloat(toSplit.amount).toFixed(0)}</Text>}
+                    </View>
+                  </View>
+                );
+              })
+            )}
+            <View style={{ height: 20 }} />
+          </ScrollView>
+
+          <TouchableOpacity
+            style={[styles.settleModalBtn, { marginTop: 16, width: '100%' }]}
+            onPress={() => { setBalanceDetail(null); handleSettleUp(balanceDetail); }}
+          >
+            <Text style={styles.settleModalBtnText}>Settle Up ₹{parseFloat(balanceDetail?.amount || 0).toFixed(0)}</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      {/* Settle Up Modal */}
+      <Modal visible={!!settleModal} transparent animationType="slide" onRequestClose={() => setSettleModal(null)}>
+        <TouchableOpacity style={styles.settleModalBackdrop} activeOpacity={1} onPress={() => setSettleModal(null)} />
+        <View style={styles.settleModalSheet}>
+          <View style={styles.settleModalPill} />
+          <Text style={styles.settleModalTitle}>Record Settlement</Text>
+          <Text style={styles.settleModalSub}>
+            {settleModal?.from?.name} → {settleModal?.to?.name}
+          </Text>
+          <View style={styles.settleModalAmountRow}>
+            <Text style={styles.settleModalCurrency}>₹</Text>
+            <TextInput
+              style={styles.settleModalInput}
+              keyboardType="numeric"
+              value={settleAmount}
+              onChangeText={setSettleAmount}
+              placeholder="0"
+              placeholderTextColor="#A0AEC0"
+            />
+          </View>
+          <TouchableOpacity
+            style={[styles.settleModalBtn, settling && { opacity: 0.7 }]}
+            onPress={confirmSettle}
+            disabled={settling}
+          >
+            {settling
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.settleModalBtnText}>Confirm Settlement</Text>
+            }
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.settleModalCancel} onPress={() => setSettleModal(null)}>
+            <Text style={styles.settleModalCancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
 
       {/* Add Member Modal */}
       <Modal 
@@ -710,16 +959,61 @@ const styles = StyleSheet.create({
   donutCenterText: { fontSize: 16, fontWeight: '800', color: colors.textPrimary },
   
   legendRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, paddingHorizontal: 8 },
-  legendDot: { width: 12, height: 12, borderRadius: 6, marginRight: 12 },
-  legendText: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-  legendAmount: { fontSize: 15, fontWeight: '800', color: colors.textPrimary },
+  legendDot: { width: 12, height: 12, borderRadius: 6, marginRight: 8 },
+  legendIcon: { fontSize: 16, marginRight: 6 },
+  legendText: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+  legendPct: { fontSize: 12, color: colors.textSecondary, marginRight: 8, fontWeight: '600' },
+  legendAmount: { fontSize: 14, fontWeight: '800', color: colors.textPrimary },
   
-  detailedSummaryCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  detailedSummaryTitle: { fontSize: 15, fontWeight: '800', color: colors.textPrimary, marginBottom: 12 },
-  detailedSummaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  detailedSummaryDate: { width: 60, fontSize: 13, color: colors.textSecondary },
-  detailedSummaryCategory: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.textPrimary },
-  detailedSummaryAmount: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  donutCenterLabel: { fontSize: 10, color: colors.textSecondary, fontWeight: '600', marginBottom: 2 },
+  spendingTotal: { fontSize: 28, fontWeight: '900', color: colors.primary, marginVertical: 12, textAlign: 'center' },
+  
+  detailedSummaryCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  detailedSummaryTitleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  detailedSummaryTitle: { flex: 1, fontSize: 15, fontWeight: '800', color: colors.textPrimary },
+  detailedSummaryTotal: { fontSize: 15, fontWeight: '800', color: colors.primary },
+  detailedSummaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
+  detailedSummaryDate: { width: 60, fontSize: 12, color: colors.textSecondary },
+  detailedSummaryCategory: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.textPrimary },
+  detailedSummaryAmount: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+
+  toggleTrackOn: { backgroundColor: '#10B981' },
+  toggleThumbOn: { transform: [{ translateX: 20 }] },
+
+  settleModalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  settleModalSheet: {
+    backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    padding: 28, paddingBottom: 48, alignItems: 'center',
+  },
+  settleModalPill: { width: 44, height: 5, borderRadius: 3, backgroundColor: '#E2E8F0', marginBottom: 20 },
+  settleModalTitle: { fontSize: 20, fontWeight: '900', color: '#1E2340', marginBottom: 6 },
+  settleModalSub: { fontSize: 14, color: '#718096', marginBottom: 24, fontWeight: '600' },
+  settleModalAmountRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 28 },
+  settleModalCurrency: { fontSize: 32, fontWeight: '800', color: '#5A67D8' },
+  settleModalInput: {
+    fontSize: 48, fontWeight: '900', color: '#1E2340',
+    minWidth: 120, textAlign: 'center', borderBottomWidth: 3, borderBottomColor: '#5A67D8',
+  },
+  settleModalBtn: {
+    backgroundColor: '#5A67D8', width: '100%', paddingVertical: 16,
+    borderRadius: 16, alignItems: 'center', marginBottom: 12,
+  },
+  settleModalBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  settleModalCancel: { paddingVertical: 12 },
+  settleModalCancelText: { color: '#A0AEC0', fontSize: 15, fontWeight: '600' },
+
+  balanceTapHint: { fontSize: 11, color: '#A0AEC0', textAlign: 'center', marginTop: 8, fontWeight: '500' },
+  otherBalanceSubText: { fontSize: 11, color: '#A0AEC0', marginTop: 2 },
+
+  bdExpenseRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
+    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
+  },
+  bdExpenseLeft: { flex: 1, marginRight: 8 },
+  bdExpenseTitle: { fontSize: 14, fontWeight: '700', color: '#1E2340', marginBottom: 3 },
+  bdExpenseDate: { fontSize: 11, color: '#A0AEC0' },
+  bdExpenseRight: { alignItems: 'flex-end' },
+  bdSplitText: { fontSize: 12, fontWeight: '600', color: '#5A67D8', marginBottom: 2 },
 
   fab: { position: 'absolute', bottom: 24, right: 24, width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', shadowColor: colors.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 8 },
 

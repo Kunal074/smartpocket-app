@@ -42,7 +42,7 @@ export default function PersonBalanceDetailScreen({ route, navigation }) {
       <View style={styles.summaryBanner}>
         <View>
           <Text style={styles.summaryLabel}>
-            {owedToYou ? 'OVERALL YOU ARE OWED' : 'OVERALL YOU OWE'}
+            {owedToYou ? 'OVERALL AAPKO MILEGA' : 'OVERALL AAPKO DENA HAI'}
           </Text>
           <Text style={[styles.summaryAmount, { color: amtColor }]}>₹{amt}</Text>
         </View>
@@ -120,7 +120,7 @@ export default function PersonBalanceDetailScreen({ route, navigation }) {
                           <Text style={styles.groupCardMembers}>{group.memberCount} Members</Text>
                         </View>
                         <Text style={[styles.groupCardAmount, { color: groupOwedToYou ? '#10B981' : '#E53E3E' }]}>
-                          {groupOwedToYou ? `You get ₹${groupAmt}` : `You owe ₹${groupAmt}`}
+                          {groupOwedToYou ? `Aapko milega ₹${groupAmt}` : `Aapko dena hai ₹${groupAmt}`}
                         </Text>
                       </View>
                       <View style={styles.groupCardDivider} />
