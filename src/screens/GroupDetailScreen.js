@@ -18,7 +18,7 @@ const CATEGORIES = [
 ];
 
 export default function GroupDetailScreen({ route, navigation }) {
-  const { groupId, groupName: routeGroupName } = route.params;
+  const { groupId, groupName: routeGroupName, forceReload } = route.params;
   const { user } = useAuth();
   
   const [group, setGroup] = useState(null);
@@ -79,7 +79,7 @@ export default function GroupDetailScreen({ route, navigation }) {
       loadData();
 
       return () => { isActive = false; };
-    }, [groupId, reloadKey])
+    }, [groupId, reloadKey, forceReload])
   );
 
   const handleOpenContacts = async () => {

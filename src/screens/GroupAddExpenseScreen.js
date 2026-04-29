@@ -30,7 +30,7 @@ const CATEGORIES = [
 ];
 
 export default function GroupAddExpenseScreen({ route, navigation }) {
-  const { groupId, groupName, members: initialMembers = [], editMode, expense, splits = [] } = route.params || {};
+  const { groupId, groupName: routeGroupName, members: initialMembers = [], editMode, expense, splits = [] } = route.params || {};
   const { user } = useAuth();
   
   const isPersonal = !groupId;
@@ -344,7 +344,12 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
         return api.post(`/groups/${groupId}/expenses`, item.payload);
       });
       await Promise.all(promises);
-      navigation.goBack();
+      // Navigate back and signal GroupDetail to reload
+      if (editMode) {
+        navigation.goBack();
+      } else {
+        navigation.navigate('GroupDetail', { groupId, groupName: routeGroupName, forceReload: Date.now() });
+      }
     } catch (e) {
       Alert.alert('Failed', e.response?.data?.error || e.message);
     } finally {
@@ -384,12 +389,12 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
               <Plus color={colors.surface} size={24} />
             </TouchableOpacity>
             
-            {members.map(m => (
+            {members.filter(m => m && m.user_id).map(m => (
               <View key={m.user_id} style={styles.memberAvatarContainer}>
                 <View style={styles.memberAvatar}>
-                  <Text style={styles.memberAvatarInitials}>{m.name?.charAt(0).toUpperCase()}</Text>
+                  <Text style={styles.memberAvatarInitials}>{m.name?.charAt(0)?.toUpperCase() || '?'}</Text>
                 </View>
-                <Text style={styles.memberName}>{m.user_id === user?.id ? 'You' : m.name.split(' ')[0]}</Text>
+                <Text style={styles.memberName}>{m.user_id === user?.id ? 'You' : (m.name?.split(' ')[0] || '?')}</Text>
               </View>
             ))}
           </ScrollView>
@@ -507,7 +512,7 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
               <View style={styles.splitAmongSection}>
                 <Text style={styles.label}>Split among <Text style={styles.labelLight}>( Tap to unselect )</Text></Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.splitMembersList}>
-                  {members.map(m => {
+                  {members.filter(m => m && m.user_id).map(m => {
                     const isSelected = selectedMembers.includes(m.user_id);
                     return (
                       <TouchableOpacity 
@@ -517,7 +522,7 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
                       >
                         <View style={[styles.splitMemberTop, isSelected && styles.splitMemberTopActive]}>
                           <Text style={[styles.splitMemberName, isSelected && styles.splitMemberNameActive]}>
-                            {m.user_id === user?.id ? 'You' : m.name.split(' ')[0]}
+                            {m.user_id === user?.id ? 'You' : (m.name?.split(' ')[0] || '?')}
                           </Text>
                         </View>
                         <View style={styles.splitMemberBottom}>
@@ -755,9 +760,9 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
                     <Text style={styles.pickerItemText}>{c.label}</Text>
                   </TouchableOpacity>
                 ))}
-                {pickerModal === 'payer' && members.map(m => (
+                {pickerModal === 'payer' && members.filter(m => m && m.user_id).map(m => (
                   <TouchableOpacity key={m.user_id} style={styles.pickerItem} onPress={() => { setPaidBy(m.user_id); setPickerModal(null); }}>
-                    <Text style={styles.pickerItemText}>{m.user_id === user?.id ? 'You' : m.name}</Text>
+                    <Text style={styles.pickerItemText}>{m.user_id === user?.id ? 'You' : (m.name || '?')}</Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
