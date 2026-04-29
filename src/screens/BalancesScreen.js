@@ -20,6 +20,8 @@ export default function BalancesScreen({ navigation }) {
   const [settleModal, setSettleModal] = useState(null); // { person, group }
   const [settleAmount, setSettleAmount] = useState('');
   const [settling, setSettling] = useState(false);
+  const [settlements, setSettlements] = useState([]);
+  const [loadingSettlements, setLoadingSettlements] = useState(false);
 
   const fetchBalances = useCallback(async () => {
     try {
@@ -36,7 +38,20 @@ export default function BalancesScreen({ navigation }) {
   useFocusEffect(useCallback(() => {
     setLoading(true);
     fetchBalances();
+    fetchSettlements();
   }, [fetchBalances]));
+
+  const fetchSettlements = async () => {
+    setLoadingSettlements(true);
+    try {
+      const res = await api.get('/settlements');
+      setSettlements(Array.isArray(res.data) ? res.data : []);
+    } catch (e) {
+      console.warn('Failed to fetch settlements', e);
+    } finally {
+      setLoadingSettlements(false);
+    }
+  };
 
   const confirmSettle = async () => {
     if (!settleAmount || isNaN(settleAmount) || parseFloat(settleAmount) <= 0) {
@@ -159,8 +174,12 @@ export default function BalancesScreen({ navigation }) {
             <Text style={styles.summaryBoxLabel}>Will Get</Text>
             <Text style={[styles.summaryBoxAmount, { color: '#10B981' }]}>₹{willGet.toFixed(2)}</Text>
           </View>
-          <TouchableOpacity style={styles.summaryBox}>
-            <Text style={styles.summaryBoxLabel}>Settled</Text>
+          <TouchableOpacity
+            style={[styles.summaryBox, activeFilter === 'Settled' && { backgroundColor: '#EEF2FF', borderRadius: 12 }]}
+            onPress={() => setActiveFilter(f => f === 'Settled' ? 'Friends' : 'Settled')}
+          >
+            <Text style={[styles.summaryBoxLabel, activeFilter === 'Settled' && { color: '#5A67D8' }]}>Settled</Text>
+            <Text style={[styles.summaryBoxAmount, { color: '#5A67D8', fontSize: 14 }]}>{settlements.length}</Text>
           </TouchableOpacity>
         </View>
 
@@ -176,62 +195,97 @@ export default function BalancesScreen({ navigation }) {
           <ChevronRight color={colors.textSecondary} size={20} />
         </TouchableOpacity>
 
-        {/* Person Cards */}
-        {byPerson.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>All settled up! 🎉</Text>
-            <Text style={styles.emptySubtitle}>No outstanding balances with anyone.</Text>
-          </View>
-        ) : (
-          byPerson.map(person => {
-            const owedToYou = person.net > 0;
-            const amt = Math.abs(person.net).toFixed(0);
-            const avatarColor = getAvatarColor(person.name);
-
-            return (
-              <TouchableOpacity
-                key={person.userId}
-                style={styles.personCard}
-                onPress={() => navigation.navigate('PersonBalanceDetail', { person })}
-              >
-                <View style={styles.personCardLeft}>
-                  {/* Avatar */}
-                  <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
-                    <Text style={styles.avatarText}>{getInitials(person.name)}</Text>
-                  </View>
-                  <View style={styles.personInfo}>
-                    <Text style={styles.personName}>{person.name}</Text>
-                    {person.phone ? (
-                      <Text style={styles.personPhone}>{person.phone}</Text>
-                    ) : (
-                      <Text style={styles.personPhone}>
-                        {(person.groups || []).map(g => g.groupName).join(', ')}
+        {/* Person Cards OR Settlement History */}
+        {activeFilter === 'Settled' ? (
+          // ── Settlement History ───────────────────────────────────
+          loadingSettlements ? (
+            <ActivityIndicator color="#5A67D8" style={{ marginTop: 40 }} />
+          ) : settlements.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>No settlements yet 📭</Text>
+              <Text style={styles.emptySubtitle}>Your past settlements will appear here.</Text>
+            </View>
+          ) : (
+            settlements.map((s, idx) => {
+              const iSent = s.paid_by === user?.id;
+              const date = new Date(s.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+              return (
+                <View key={s.id || idx} style={styles.settlementCard}>
+                  <View style={styles.settlementCardLeft}>
+                    <View style={[styles.avatar, { backgroundColor: iSent ? '#E53E3E' : '#10B981' }]}>
+                      <Text style={styles.avatarText}>{(iSent ? s.payee_name : s.payer_name)?.charAt(0)?.toUpperCase()}</Text>
+                    </View>
+                    <View style={styles.personInfo}>
+                      <Text style={styles.personName}>
+                        {iSent ? `You → ${s.payee_name}` : `${s.payer_name} → You`}
                       </Text>
-                    )}
+                      <Text style={styles.personPhone}>{s.group_name} • {date}</Text>
+                    </View>
                   </View>
-                </View>
-
-                <View style={styles.personCardRight}>
-                  <Text style={[styles.personAmount, { color: owedToYou ? '#10B981' : '#E53E3E' }]}>
-                    ₹{amt}
+                  <Text style={[styles.personAmount, { color: iSent ? '#E53E3E' : '#10B981' }]}>
+                    {iSent ? '-' : '+'}₹{parseFloat(s.amount).toFixed(0)}
                   </Text>
-                  <View style={styles.personActions}>
-                    <TouchableOpacity
-                      onPress={() => Alert.alert('Remind', `Reminder sent to ${person.name}!`)}
-                    >
-                      <Text style={styles.remindText}>Remind</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.settleUpBtn}
-                      onPress={() => handleSettlePress(person)}
-                    >
-                      <Text style={styles.settleUpBtnText}>Settle Up</Text>
-                    </TouchableOpacity>
-                  </View>
                 </View>
-              </TouchableOpacity>
-            );
-          })
+              );
+            })
+          )
+        ) : (
+          // ── Active Balances ──────────────────────────────────────
+          byPerson.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>All settled up! 🎉</Text>
+              <Text style={styles.emptySubtitle}>No outstanding balances with anyone.</Text>
+            </View>
+          ) : (
+            byPerson.map(person => {
+              const owedToYou = person.net > 0;
+              const amt = Math.abs(person.net).toFixed(0);
+              const avatarColor = getAvatarColor(person.name);
+
+              return (
+                <TouchableOpacity
+                  key={person.userId}
+                  style={styles.personCard}
+                  onPress={() => navigation.navigate('PersonBalanceDetail', { person })}
+                >
+                  <View style={styles.personCardLeft}>
+                    <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
+                      <Text style={styles.avatarText}>{getInitials(person.name)}</Text>
+                    </View>
+                    <View style={styles.personInfo}>
+                      <Text style={styles.personName}>{person.name}</Text>
+                      {person.phone ? (
+                        <Text style={styles.personPhone}>{person.phone}</Text>
+                      ) : (
+                        <Text style={styles.personPhone}>
+                          {(person.groups || []).map(g => g.groupName).join(', ')}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={styles.personCardRight}>
+                    <Text style={[styles.personAmount, { color: owedToYou ? '#10B981' : '#E53E3E' }]}>
+                      ₹{amt}
+                    </Text>
+                    <View style={styles.personActions}>
+                      <TouchableOpacity
+                        onPress={() => Alert.alert('Remind', `Reminder sent to ${person.name}!`)}
+                      >
+                        <Text style={styles.remindText}>Remind</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.settleUpBtn}
+                        onPress={() => handleSettlePress(person)}
+                      >
+                        <Text style={styles.settleUpBtnText}>Settle Up</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          )
         )}
 
         <View style={{ height: 40 }} />
@@ -404,4 +458,16 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', paddingTop: 60 },
   emptyTitle: { fontSize: 20, fontWeight: '800', color: colors.textPrimary, marginBottom: 8 },
   emptySubtitle: { fontSize: 14, color: colors.textSecondary },
+
+  settlementCard: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    marginHorizontal: 20, marginBottom: 12,
+    borderRadius: 16, padding: 16,
+    borderWidth: 1, borderColor: colors.borderLight,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
+  },
+  settlementCardLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
 });

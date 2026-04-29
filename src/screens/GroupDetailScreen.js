@@ -710,12 +710,20 @@ export default function GroupDetailScreen({ route, navigation }) {
             <View style={{ height: 20 }} />
           </ScrollView>
 
-          <TouchableOpacity
-            style={[styles.settleModalBtn, { marginTop: 16, width: '100%' }]}
-            onPress={() => { setBalanceDetail(null); handleSettleUp(balanceDetail); }}
-          >
-            <Text style={styles.settleModalBtnText}>Settle Up ₹{parseFloat(balanceDetail?.amount || 0).toFixed(0)}</Text>
-          </TouchableOpacity>
+          {balanceDetail?.from?.id === user?.id ? (
+            <TouchableOpacity
+              style={[styles.settleModalBtn, { marginTop: 16, width: '100%' }]}
+              onPress={() => { setBalanceDetail(null); handleSettleUp(balanceDetail); }}
+            >
+              <Text style={styles.settleModalBtnText}>Settle Up ₹{parseFloat(balanceDetail?.amount || 0).toFixed(0)}</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={{ marginTop: 16, width: '100%', backgroundColor: '#F7FAFC', borderRadius: 16, padding: 14, alignItems: 'center' }}>
+              <Text style={{ color: '#718096', fontSize: 14, fontWeight: '600', textAlign: 'center' }}>
+                💡 Yeh {balanceDetail?.from?.name} aur {balanceDetail?.to?.name} ke beech ka settlement hai
+              </Text>
+            </View>
+          )}
         </View>
       </Modal>
 

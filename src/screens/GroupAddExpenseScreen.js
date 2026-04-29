@@ -177,13 +177,19 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
     }
   };
 
-  const handleAddByEmail = async () => {
-    const email = memberEmail.trim();
-    if (!email || !email.includes('@')) { Alert.alert('Error', 'Enter a valid email address'); return; }
+  const handleAddByContact = async () => {
+    const input = memberEmail.trim();
+    if (!input) { Alert.alert('Error', 'Enter an email or phone number'); return; }
+    const isEmail = input.includes('@');
+    if (!isEmail && input.replace(/\D/g, '').length < 10) {
+      Alert.alert('Error', 'Enter a valid 10-digit phone number or email address');
+      return;
+    }
+    const payload = isEmail ? { email: input } : { phone: input.replace(/\s|-/g, '') };
     try {
-      if (isPersonal) await api.post('/friends', { email });
-      else await api.post(`/groups/${groupId}/members`, { email });
-      Alert.alert('Success', `\u2705 Member added!`);
+      if (isPersonal) await api.post('/friends', payload);
+      else await api.post(`/groups/${groupId}/members`, payload);
+      Alert.alert('Success', '\u2705 Member added!');
       setMemberEmail('');
       refreshMembers();
     } catch (e) {
@@ -667,20 +673,20 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
               </TouchableOpacity>
             </View>
 
-            {/* Email Input Section */}
+            {/* Email / Phone Input Section */}
             <View style={styles.emailSection}>
-              <Text style={styles.emailSectionTitle}>Add by Email</Text>
+              <Text style={styles.emailSectionTitle}>Add by Email or Phone</Text>
               <View style={styles.emailRow}>
                 <TextInput
                   style={styles.emailInput}
-                  placeholder="friend@email.com"
+                  placeholder="email or 10-digit phone number"
                   placeholderTextColor={colors.textMuted}
                   value={memberEmail}
                   onChangeText={setMemberEmail}
-                  keyboardType="email-address"
+                  keyboardType="default"
                   autoCapitalize="none"
                 />
-                <TouchableOpacity style={styles.emailAddBtn} onPress={handleAddByEmail}>
+                <TouchableOpacity style={styles.emailAddBtn} onPress={handleAddByContact}>
                   <Text style={styles.emailAddBtnText}>Add</Text>
                 </TouchableOpacity>
               </View>
