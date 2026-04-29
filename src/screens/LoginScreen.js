@@ -14,16 +14,25 @@ export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [errorIsNoAccount, setErrorIsNoAccount] = useState(false);
 
   const handleLogin = async () => {
-    if (!email || !password) return;
-    
+    if (!email || !password) {
+      setErrorMsg('Please enter your email and password.');
+      setErrorIsNoAccount(false);
+      return;
+    }
+    setErrorMsg('');
+    setErrorIsNoAccount(false);
     setIsLoading(true);
     try {
-      // Calls our mock login in Zustand which sets the auth_token
       await login(email, password);
     } catch (error) {
-      alert("Login failed");
+      const msg = error?.response?.data?.error || error?.message || 'Login failed. Please try again.';
+      const isNoAccount = error?.response?.status === 404;
+      setErrorMsg(msg);
+      setErrorIsNoAccount(isNoAccount);
     } finally {
       setIsLoading(false);
     }
@@ -84,6 +93,18 @@ export default function LoginScreen({ navigation }) {
               <TouchableOpacity style={styles.forgotPassword}>
                 <Text style={styles.forgotText}>Forgot password?</Text>
               </TouchableOpacity>
+
+              {/* Error Banner */}
+              {!!errorMsg && (
+                <View style={styles.errorBanner}>
+                  <Text style={styles.errorBannerText}>⚠️  {errorMsg}</Text>
+                  {errorIsNoAccount && (
+                    <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
+                      <Text style={styles.errorSignupLink}>Create an account →</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
 
               <TouchableOpacity 
                 style={styles.loginBtn}
@@ -232,5 +253,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: colors.primary,
+  },
+
+  errorBanner: {
+    backgroundColor: '#FFF5F5',
+    borderWidth: 1,
+    borderColor: '#FEB2B2',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+  },
+  errorBannerText: {
+    fontSize: 14,
+    color: '#C53030',
+    fontWeight: '600',
+    lineHeight: 20,
+  },
+  errorSignupLink: {
+    fontSize: 14,
+    color: colors.primary,
+    fontWeight: '700',
+    marginTop: 8,
   },
 });

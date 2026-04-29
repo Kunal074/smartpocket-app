@@ -376,7 +376,7 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
           </Text>
           {!isPersonal && (
             <View style={styles.groupBadge}>
-              <Text style={styles.groupBadgeText}>{groupName}</Text>
+              <Text style={styles.groupBadgeText}>{routeGroupName}</Text>
             </View>
           )}
         </View>

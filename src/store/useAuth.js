@@ -25,22 +25,18 @@ export const useAuth = create((set) => ({
   },
 
   login: async (email, password) => {
-    set({ isLoading: true, error: null });
+    set({ error: null });
     try {
-      // Connect to the real PERN backend!
       const res = await api.post('/auth/login', { email, password });
-      
       const realToken = res.data.token;
       const realUser = res.data.user;
-      
       await AsyncStorage.setItem('auth_token', realToken);
-      set({ user: realUser, token: realToken, isLoading: false });
+      set({ user: realUser, token: realToken });
       return true;
     } catch (err) {
-      // Axios error handling
       const message = err.response?.data?.error || err.message || 'Login failed';
-      set({ error: message, isLoading: false });
-      return false;
+      set({ error: message });
+      throw err; // re-throw so LoginScreen can read the specific message
     }
   },
 
