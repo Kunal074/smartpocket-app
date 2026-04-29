@@ -67,6 +67,56 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
   
   const [editedAmounts, setEditedAmounts] = useState(new Set());
 
+  // Multiple Bills State
+  const [bills, setBills] = useState([]);
+  const [activeBillIndex, setActiveBillIndex] = useState(0);
+
+  const [pickerModal, setPickerModal] = useState(null); // 'category' | 'payer'
+
+  const saveCurrentToBills = (targetBills, targetIndex) => {
+    targetBills[targetIndex] = {
+      description, category, price, paidBy, splitType,
+      selectedMembers, customAmounts, customShares, editedAmounts, unequalMode
+    };
+  };
+
+  const loadBillToState = (bill) => {
+    setDescription(bill.description);
+    setCategory(bill.category);
+    setPrice(bill.price);
+    setPaidBy(bill.paidBy);
+    setSplitType(bill.splitType);
+    setSelectedMembers(bill.selectedMembers);
+    setCustomAmounts(bill.customAmounts);
+    setCustomShares(bill.customShares);
+    setEditedAmounts(bill.editedAmounts);
+    setUnequalMode(bill.unequalMode);
+  };
+
+  const handleAddBill = () => {
+    const newBills = [...bills];
+    saveCurrentToBills(newBills, activeBillIndex);
+    setBills(newBills);
+    
+    setActiveBillIndex(newBills.length);
+    setDescription('');
+    setCategory('other');
+    setPrice('');
+    setSplitType('equal');
+    setCustomAmounts({});
+    setEditedAmounts(new Set());
+    setUnequalMode('amount');
+  };
+
+  const switchBill = (index) => {
+    if (index === activeBillIndex) return;
+    const newBills = [...bills];
+    saveCurrentToBills(newBills, activeBillIndex);
+    setBills(newBills);
+    setActiveBillIndex(index);
+    loadBillToState(newBills[index]);
+  };
+
   // Add Member Modal State
   const [showAddMember, setShowAddMember] = useState(false);
   const [contacts, setContacts] = useState([]);
@@ -221,85 +271,87 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
   };
 
   const handleSubmit = async () => {
-    if (!price || isNaN(price)) { alert('Enter a valid price'); return; }
-    if (!description.trim()) { alert('Enter a description'); return; }
-    if (selectedMembers.length === 0) { alert('Select at least one member to split with'); return; }
+    // Save current active bill to the array before validation
+    const allBills = [...bills];
+    saveCurrentToBills(allBills, activeBillIndex);
+    
+    // Validate all bills
+    const payloads = [];
+    for (let i = 0; i < allBills.length; i++) {
+      const b = allBills[i];
+      if (!b.price || isNaN(b.price)) { alert(`Enter a valid price for Bill ${i + 1}`); return; }
+      if (!b.description.trim()) { alert(`Enter a description for Bill ${i + 1}`); return; }
+      if (b.selectedMembers.length === 0) { alert(`Select at least one member for Bill ${i + 1}`); return; }
 
-    let backendSplitType = 'equal';
-    let membersPayload = [];
+      let backendSplitType = 'equal';
+      let membersPayload = [];
 
-    if (splitType === 'equal') {
-      membersPayload = selectedMembers.map(id => ({ user_id: id }));
-    } else if (splitType === 'unequal') {
-      if (unequalMode === 'amount') {
-        backendSplitType = 'custom';
-        let sum = 0;
-        membersPayload = selectedMembers.map(id => {
-          const amt = parseFloat(customAmounts[id] || 0);
-          sum += amt;
-          return { user_id: id, amount: amt };
+      if (b.splitType === 'equal') {
+        membersPayload = b.selectedMembers.map(id => ({ user_id: id }));
+      } else if (b.splitType === 'unequal') {
+        if (b.unequalMode === 'amount') {
+          backendSplitType = 'custom';
+          let sum = 0;
+          membersPayload = b.selectedMembers.map(id => {
+            const amt = parseFloat(b.customAmounts[id] || 0);
+            sum += amt;
+            return { user_id: id, amount: amt };
+          });
+          if (Math.abs(sum - parseFloat(b.price)) > 0.01) {
+            Alert.alert('Amount Mismatch', `In Bill ${i + 1}, custom amounts sum (\u20B9${sum}) must equal the total price (\u20B9${b.price})`);
+            if (activeBillIndex !== i) switchBill(i);
+            setShowUnequalModal(true);
+            return;
+          }
+        } else if (b.unequalMode === 'shares') {
+          backendSplitType = 'percentage';
+          let totalShares = 0;
+          b.selectedMembers.forEach(id => totalShares += parseFloat(b.customShares[id] || 0));
+          if (totalShares === 0) {
+            Alert.alert('Invalid Shares', `Total shares cannot be 0 in Bill ${i + 1}.`);
+            return;
+          }
+          membersPayload = b.selectedMembers.map(id => {
+            const share = parseFloat(b.customShares[id] || 0);
+            return { user_id: id, percentage: (share / totalShares) * 100 };
+          });
+        }
+      }
+
+      if (isPersonal && b.selectedMembers.length === 1 && b.selectedMembers[0] === user?.id) {
+        payloads.push({
+          type: 'personal',
+          payload: {
+            title: b.description, amount: parseFloat(b.price), categoryId: b.category, note: b.description, date: new Date().toISOString().slice(0, 10)
+          }
         });
-        if (Math.abs(sum - parseFloat(price)) > 0.01) {
-          Alert.alert('Amount Mismatch', `Custom amounts sum (\u20B9${sum}) must equal the total price (\u20B9${price})`);
-          setShowUnequalModal(true);
-          return;
-        }
-      } else if (unequalMode === 'shares') {
-        backendSplitType = 'percentage';
-        let totalShares = 0;
-        selectedMembers.forEach(id => totalShares += parseFloat(customShares[id] || 0));
-        if (totalShares === 0) {
-          Alert.alert('Invalid Shares', 'Total shares cannot be 0.');
-          return;
-        }
-        membersPayload = selectedMembers.map(id => {
-          const share = parseFloat(customShares[id] || 0);
-          return { user_id: id, percentage: (share / totalShares) * 100 };
+      } else {
+        payloads.push({
+          type: 'group',
+          payload: {
+            title: b.description, amount: parseFloat(b.price), category: b.category, split_type: backendSplitType, note: b.description, paid_by: b.paidBy, members: membersPayload
+          }
         });
       }
     }
 
     setSaving(true);
     try {
-      if (isPersonal && selectedMembers.length === 1 && selectedMembers[0] === user?.id) {
-        // Purely personal bill (no split)
-        const payload = {
-          title: description,
-          amount: parseFloat(price),
-          categoryId: category, // Matches old personal expenses schema
-          note: description,
-          date: new Date().toISOString().slice(0, 10)
-        };
-        await api.post('/expenses', payload);
-        navigation.goBack();
-      } else {
-        // Group or Direct Split
-        const payload = {
-          title: description,
-          amount: parseFloat(price),
-          category: category,
-          split_type: backendSplitType,
-          note: description,
-          paid_by: paidBy,
-          members: membersPayload,
-        };
-
-        if (isPersonal) {
-          // Direct 1-on-1 Split
-          await api.post('/expenses/direct', payload);
-        } else if (editMode) {
-          await api.put(`/groups/${groupId}/expenses/${expense.id}`, payload);
-        } else {
-          await api.post(`/groups/${groupId}/expenses`, payload);
-        }
-        navigation.goBack();
-      }
+      const promises = payloads.map(item => {
+        if (item.type === 'personal') return api.post('/expenses', item.payload);
+        if (isPersonal) return api.post('/expenses/direct', item.payload);
+        if (editMode) return api.put(`/groups/${groupId}/expenses/${expense.id}`, item.payload);
+        return api.post(`/groups/${groupId}/expenses`, item.payload);
+      });
+      await Promise.all(promises);
+      navigation.goBack();
     } catch (e) {
       Alert.alert('Failed', e.response?.data?.error || e.message);
     } finally {
       setSaving(false);
     }
   };
+
 
   // Calculate remaining amount for unequal modal
   const totalEnteredAmount = selectedMembers.reduce((sum, id) => sum + parseFloat(customAmounts[id] || 0), 0);
@@ -344,13 +396,26 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
 
           {/* Bill Action Row */}
           <View style={styles.billActionRow}>
-            <View style={styles.billBadge}>
-              <Text style={styles.billBadgeText}>Bill 1</Text>
-            </View>
-            <TouchableOpacity style={styles.addBillBtn} onPress={() => Alert.alert('Coming Soon', 'Adding multiple bills at once is coming in a future update!')}>
-              <Plus color={colors.primary} size={16} />
-              <Text style={styles.addBillText}>Add bill</Text>
-            </TouchableOpacity>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+              {Array.from({ length: Math.max(bills.length, activeBillIndex + 1) }).map((_, i) => (
+                <TouchableOpacity
+                  key={i}
+                  style={[styles.billBadge, activeBillIndex === i ? styles.billBadgeActive : styles.billBadgeInactive]}
+                  onPress={() => switchBill(i)}
+                >
+                  <Text style={[styles.billBadgeText, activeBillIndex === i ? styles.billBadgeTextActive : styles.billBadgeTextInactive]}>
+                    Bill {i + 1}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            
+            {!editMode && (
+              <TouchableOpacity style={styles.addBillBtn} onPress={handleAddBill}>
+                <Plus color={colors.primary} size={16} />
+                <Text style={styles.addBillText}>Add bill</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Main Card */}
@@ -383,7 +448,7 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
               </View>
               <View style={styles.formCol}>
                 <Text style={styles.label}>Category</Text>
-                <TouchableOpacity style={styles.dropdownBtn}>
+                <TouchableOpacity style={styles.dropdownBtn} onPress={() => setPickerModal('category')}>
                   <Text style={styles.dropdownText}>
                     {CATEGORIES.find(c => c.value === category)?.label || 'Misc.'}
                   </Text>
@@ -412,8 +477,10 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
               </View>
               <View style={styles.formCol}>
                 <Text style={styles.label}>Paid By</Text>
-                <TouchableOpacity style={styles.dropdownBtn}>
-                  <Text style={styles.dropdownText}>You</Text>
+                <TouchableOpacity style={styles.dropdownBtn} onPress={() => setPickerModal('payer')}>
+                  <Text style={styles.dropdownText}>
+                    {members.find(m => m.user_id === paidBy)?.name === user?.name ? 'You' : (members.find(m => m.user_id === paidBy)?.name || 'You')}
+                  </Text>
                   <ChevronDown color={colors.textSecondary} size={16} />
                 </TouchableOpacity>
               </View>
@@ -672,6 +739,30 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
                 />
             }
           </SafeAreaView>
+        </Modal>
+
+        {/* Picker Modal for Category and Payer */}
+        <Modal visible={!!pickerModal} transparent animationType="slide" onRequestClose={() => setPickerModal(null)}>
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setPickerModal(null)}>
+            <View style={[styles.modalContent, { maxHeight: '50%' }]}>
+              <View style={styles.modalHandle} />
+              <Text style={[styles.label, { marginBottom: 16 }]}>
+                {pickerModal === 'category' ? 'Select Category' : 'Select Payer'}
+              </Text>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {pickerModal === 'category' && CATEGORIES.map(c => (
+                  <TouchableOpacity key={c.value} style={styles.pickerItem} onPress={() => { setCategory(c.value); setPickerModal(null); }}>
+                    <Text style={styles.pickerItemText}>{c.label}</Text>
+                  </TouchableOpacity>
+                ))}
+                {pickerModal === 'payer' && members.map(m => (
+                  <TouchableOpacity key={m.user_id} style={styles.pickerItem} onPress={() => { setPaidBy(m.user_id); setPickerModal(null); }}>
+                    <Text style={styles.pickerItemText}>{m.user_id === user?.id ? 'You' : m.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </TouchableOpacity>
         </Modal>
 
       </KeyboardAvoidingView>
