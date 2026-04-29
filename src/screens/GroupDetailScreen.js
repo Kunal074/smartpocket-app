@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, Platform,
   FlatList, TouchableOpacity, ActivityIndicator, Modal, TextInput,
-  Image, Share, Alert, ScrollView
+  Image, Share, Alert, ScrollView, Linking
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { ChevronLeft, ChevronDown, Share2, Download, MessageSquare, Settings, Search, Plus, History } from 'lucide-react-native';
@@ -210,6 +210,33 @@ export default function GroupDetailScreen({ route, navigation }) {
       Alert.alert('Error', e.response?.data?.error || 'Failed to record settlement');
     } finally {
       setSettling(false);
+    }
+  };
+
+  const handleUPIPayment = async () => {
+    if (!settleAmount || isNaN(settleAmount) || parseFloat(settleAmount) <= 0) {
+      Alert.alert('Error', 'Enter a valid amount');
+      return;
+    }
+    const upiId = settleModal?.to?.upi_id;
+    if (!upiId) {
+      Alert.alert('No UPI ID', `${settleModal?.to?.name} has not added their UPI ID.`);
+      return;
+    }
+
+    const name = settleModal?.to?.name || 'SmartPocket User';
+    const amount = parseFloat(settleAmount).toFixed(2);
+    const upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(name)}&am=${amount}&cu=INR`;
+
+    try {
+      const supported = await Linking.canOpenURL(upiUrl);
+      if (supported) {
+        await Linking.openURL(upiUrl);
+      } else {
+        Alert.alert('Error', 'No UPI app found on your phone.');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Could not open UPI app.');
     }
   };
 
@@ -712,16 +739,27 @@ export default function GroupDetailScreen({ route, navigation }) {
               placeholderTextColor="#A0AEC0"
             />
           </View>
-          <TouchableOpacity
-            style={[styles.settleModalBtn, settling && { opacity: 0.7 }]}
-            onPress={confirmSettle}
-            disabled={settling}
-          >
-            {settling
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.settleModalBtnText}>Confirm Settlement</Text>
-            }
-          </TouchableOpacity>
+          
+          <View style={{ flexDirection: 'row', gap: 12, width: '100%', marginBottom: 16 }}>
+            <TouchableOpacity
+              style={[styles.settleModalBtn, { flex: 1, backgroundColor: '#EDF2F7' }, settling && { opacity: 0.7 }]}
+              onPress={confirmSettle}
+              disabled={settling}
+            >
+              {settling
+                ? <ActivityIndicator color="#5A67D8" />
+                : <Text style={[styles.settleModalBtnText, { color: '#4A5568' }]}>Already Paid</Text>
+              }
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.settleModalBtn, { flex: 1, backgroundColor: '#10B981' }]}
+              onPress={handleUPIPayment}
+            >
+              <Text style={styles.settleModalBtnText}>Pay via UPI</Text>
+            </TouchableOpacity>
+          </View>
+
           <TouchableOpacity style={styles.settleModalCancel} onPress={() => setSettleModal(null)}>
             <Text style={styles.settleModalCancelText}>Cancel</Text>
           </TouchableOpacity>
@@ -995,8 +1033,8 @@ const styles = StyleSheet.create({
     minWidth: 120, textAlign: 'center', borderBottomWidth: 3, borderBottomColor: '#5A67D8',
   },
   settleModalBtn: {
-    backgroundColor: '#5A67D8', width: '100%', paddingVertical: 16,
-    borderRadius: 16, alignItems: 'center', marginBottom: 12,
+    backgroundColor: '#5A67D8', paddingVertical: 16,
+    borderRadius: 16, alignItems: 'center', justifyContent: 'center', height: 56,
   },
   settleModalBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
   settleModalCancel: { paddingVertical: 12 },

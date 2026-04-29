@@ -19,6 +19,7 @@ export default function SettingsScreen({ navigation }) {
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [editUpi, setEditUpi] = useState('');
   const [saving, setSaving] = useState(false);
 
   // Preferences
@@ -28,6 +29,7 @@ export default function SettingsScreen({ navigation }) {
   useFocusEffect(useCallback(() => {
     setEditName(user?.name || '');
     setEditPhone(user?.phone || '');
+    setEditUpi(user?.upi_id || '');
   }, [user]));
 
   const handleSaveProfile = async () => {
@@ -40,6 +42,7 @@ export default function SettingsScreen({ navigation }) {
       const res = await api.put('/users/me', {
         name: editName.trim(),
         phone: editPhone.trim(),
+        upi_id: editUpi.trim(),
       });
       if (setUser) setUser(res.data.user);
       Alert.alert('Saved!', 'Profile update ho gayi ✅');
@@ -110,6 +113,7 @@ export default function SettingsScreen({ navigation }) {
               <Text style={styles.profileName}>{user?.name || 'User'}</Text>
               <Text style={styles.profileEmail}>{user?.email}</Text>
               {user?.phone ? <Text style={styles.profilePhone}>{user?.phone}</Text> : null}
+              {user?.upi_id ? <Text style={[styles.profilePhone, { color: '#10B981', fontWeight: '600' }]}>UPI: {user?.upi_id}</Text> : null}
               <TouchableOpacity style={styles.editProfileBtn} onPress={() => setEditing(true)}>
                 <Pencil color="#5A67D8" size={14} />
                 <Text style={styles.editProfileText}>Profile Edit Karen</Text>
@@ -131,6 +135,14 @@ export default function SettingsScreen({ navigation }) {
                 placeholder="Phone Number"
                 placeholderTextColor="#A0AEC0"
                 keyboardType="phone-pad"
+              />
+              <TextInput
+                style={styles.editInput}
+                value={editUpi}
+                onChangeText={setEditUpi}
+                placeholder="UPI ID (e.g. name@okhdfcbank)"
+                placeholderTextColor="#A0AEC0"
+                autoCapitalize="none"
               />
               <View style={styles.editBtns}>
                 <TouchableOpacity style={styles.editCancelBtn} onPress={() => setEditing(false)}>
@@ -168,6 +180,13 @@ export default function SettingsScreen({ navigation }) {
             icon={<Phone color="#F59E0B" size={18} />}
             label="Phone"
             value={user?.phone || 'Add karen'}
+            onPress={() => setEditing(true)}
+            noBorder={false}
+          />
+          <Row
+            icon={<Text style={{ fontSize: 18 }}>💳</Text>}
+            label="UPI ID"
+            value={user?.upi_id || 'Add karen'}
             onPress={() => setEditing(true)}
             noBorder
           />

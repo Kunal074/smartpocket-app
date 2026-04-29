@@ -238,10 +238,7 @@ export default function DashboardScreen({ navigation }) {
           </View>
           <TouchableOpacity
             style={styles.profileBtn}
-            onPress={() => Alert.alert('Profile', 'Log out?', [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Log Out', style: 'destructive', onPress: logout },
-            ])}
+            onPress={() => navigation.navigate('Settings')}
           >
             <View style={styles.profileAvatar}>
               <Text style={styles.profileInitial}>{(user?.name || 'U')[0].toUpperCase()}</Text>

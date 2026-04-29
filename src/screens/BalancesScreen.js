@@ -1,18 +1,25 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, Platform,
-  ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl
+  ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl,
+  Linking, Modal, TextInput
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Search, Mail, ChevronRight } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { api } from '../api/client';
+import { useAuth } from '../store/useAuth';
 
 export default function BalancesScreen({ navigation }) {
+  const { user } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState('Friends');
+
+  const [settleModal, setSettleModal] = useState(null); // { person, group }
+  const [settleAmount, setSettleAmount] = useState('');
+  const [settling, setSettling] = useState(false);
 
   const fetchBalances = useCallback(async () => {
     try {
@@ -30,6 +37,65 @@ export default function BalancesScreen({ navigation }) {
     setLoading(true);
     fetchBalances();
   }, [fetchBalances]));
+
+  const confirmSettle = async () => {
+    if (!settleAmount || isNaN(settleAmount) || parseFloat(settleAmount) <= 0) {
+      Alert.alert('Error', 'Enter a valid amount');
+      return;
+    }
+    setSettling(true);
+    try {
+      const isOwed = settleModal.group.net > 0;
+      await api.post(`/groups/${settleModal.group.groupId}/settlements`, {
+        paid_by: isOwed ? settleModal.person.userId : user.id,
+        paid_to: isOwed ? user.id : settleModal.person.userId,
+        amount: parseFloat(settleAmount),
+      });
+      setSettleModal(null);
+      fetchBalances();
+      Alert.alert('✅ Settled!', `Payment of \u20b9${settleAmount} recorded successfully.`);
+    } catch (e) {
+      Alert.alert('Error', e.response?.data?.error || 'Failed to record settlement');
+    } finally {
+      setSettling(false);
+    }
+  };
+
+  const handleUPIPayment = async () => {
+    if (!settleAmount || isNaN(settleAmount) || parseFloat(settleAmount) <= 0) {
+      Alert.alert('Error', 'Enter a valid amount');
+      return;
+    }
+    const upiId = settleModal.person.upi_id;
+    if (!upiId) {
+      Alert.alert('No UPI ID', `${settleModal.person.name} has not added their UPI ID.`);
+      return;
+    }
+    const amount = parseFloat(settleAmount).toFixed(2);
+    const upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(settleModal.person.name)}&am=${amount}&cu=INR`;
+    try {
+      const supported = await Linking.canOpenURL(upiUrl);
+      if (supported) await Linking.openURL(upiUrl);
+      else Alert.alert('Error', 'No UPI app found on your phone.');
+    } catch (e) {
+      Alert.alert('Error', 'Could not open UPI app.');
+    }
+  };
+
+  const handleSettlePress = (person) => {
+    if (!person.groups || person.groups.length === 0) {
+       Alert.alert('No Group', 'No shared groups found to settle this balance.');
+       return;
+    }
+    if (person.groups.length > 1) {
+       // Multi-group: go to detail screen to settle specific groups
+       navigation.navigate('PersonBalanceDetail', { person });
+    } else {
+       // Single group: settle directly
+       setSettleAmount(Math.abs(person.groups[0].net).toFixed(0));
+       setSettleModal({ person, group: person.groups[0] });
+    }
+  };
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -157,7 +223,7 @@ export default function BalancesScreen({ navigation }) {
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.settleUpBtn}
-                      onPress={() => Alert.alert('Coming Soon', 'Settlement flow coming soon!')}
+                      onPress={() => handleSettlePress(person)}
                     >
                       <Text style={styles.settleUpBtnText}>Settle Up</Text>
                     </TouchableOpacity>
@@ -170,6 +236,54 @@ export default function BalancesScreen({ navigation }) {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Settle Up Modal */}
+      <Modal visible={!!settleModal} transparent animationType="slide" onRequestClose={() => setSettleModal(null)}>
+        <TouchableOpacity style={styles.settleModalBackdrop} activeOpacity={1} onPress={() => setSettleModal(null)} />
+        <View style={styles.settleModalSheet}>
+          <View style={styles.settleModalPill} />
+          <Text style={styles.settleModalTitle}>Record Settlement</Text>
+          <Text style={styles.settleModalSub}>
+            {settleModal?.group?.net > 0 ? `${settleModal?.person?.name} → Aap` : `Aap → ${settleModal?.person?.name}`}
+          </Text>
+          <View style={styles.settleModalAmountRow}>
+            <Text style={styles.settleModalCurrency}>₹</Text>
+            <TextInput
+              style={styles.settleModalInput}
+              keyboardType="numeric"
+              value={settleAmount}
+              onChangeText={setSettleAmount}
+              placeholder="0"
+              placeholderTextColor="#A0AEC0"
+            />
+          </View>
+          
+          <View style={{ flexDirection: 'row', gap: 12, width: '100%', marginBottom: 16 }}>
+            <TouchableOpacity
+              style={[styles.settleModalBtn, { flex: 1, backgroundColor: '#EDF2F7' }, settling && { opacity: 0.7 }]}
+              onPress={confirmSettle}
+              disabled={settling}
+            >
+              {settling
+                ? <ActivityIndicator color="#5A67D8" />
+                : <Text style={[styles.settleModalBtnText, { color: '#4A5568' }]}>Already Paid</Text>
+              }
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.settleModalBtn, { flex: 1, backgroundColor: '#10B981' }, (settleModal?.group?.net > 0) && { opacity: 0.5 }]}
+              onPress={handleUPIPayment}
+              disabled={settleModal?.group?.net > 0} // Can't pay them if they owe you
+            >
+              <Text style={styles.settleModalBtnText}>Pay via UPI</Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity style={styles.settleModalCancel} onPress={() => setSettleModal(null)}>
+            <Text style={styles.settleModalCancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -268,7 +382,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 7,
     borderRadius: 20, borderWidth: 1.5, borderColor: '#5A67D8',
   },
-  settleUpBtnText: { fontSize: 12, fontWeight: '700', color: '#5A67D8' },
+  settleUpBtnText: { color: '#5A67D8', fontSize: 13, fontWeight: '700' },
+
+  settleModalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  settleModalSheet: {
+    backgroundColor: '#fff', borderTopLeftRadius: 32, borderTopRightRadius: 32,
+    padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    position: 'absolute', bottom: 0, width: '100%', alignItems: 'center',
+  },
+  settleModalPill: { width: 44, height: 5, borderRadius: 3, backgroundColor: '#E2E8F0', marginBottom: 20 },
+  settleModalTitle: { fontSize: 20, fontWeight: '900', color: '#1E2340', marginBottom: 4 },
+  settleModalSub: { fontSize: 14, color: '#718096', marginBottom: 24 },
+  settleModalAmountRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 32 },
+  settleModalCurrency: { fontSize: 32, fontWeight: '800', color: '#1E2340', marginRight: 8 },
+  settleModalInput: { fontSize: 48, fontWeight: '900', color: '#1E2340', minWidth: 120, textAlign: 'center', borderBottomWidth: 3, borderBottomColor: '#5A67D8' },
+  settleModalBtn: { backgroundColor: '#5A67D8', paddingVertical: 16, borderRadius: 16, alignItems: 'center', justifyContent: 'center', height: 56 },
+  settleModalBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  settleModalCancel: { paddingVertical: 12 },
+  settleModalCancelText: { color: '#A0AEC0', fontSize: 15, fontWeight: '600' },
 
   emptyState: { alignItems: 'center', paddingTop: 60 },
   emptyTitle: { fontSize: 20, fontWeight: '800', color: colors.textPrimary, marginBottom: 8 },

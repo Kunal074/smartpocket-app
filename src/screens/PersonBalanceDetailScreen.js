@@ -1,15 +1,46 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, StyleSheet, SafeAreaView, Platform,
-  ScrollView, TouchableOpacity, Alert
+  ScrollView, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator, Linking
 } from 'react-native';
 import { ChevronLeft, Globe, Users, Home, Heart, User } from 'lucide-react-native';
 import { colors } from '../theme/colors';
+import { api } from '../api/client';
+import { useAuth } from '../store/useAuth';
 
 export default function PersonBalanceDetailScreen({ route, navigation }) {
   const { person } = route.params;
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('Expenses'); // Expenses | Settlements
   const [activeSubTab, setActiveSubTab] = useState('Groups'); // Direct | Groups
+
+  const [settleModal, setSettleModal] = useState(null); // stores the group object
+  const [settleAmount, setSettleAmount] = useState('');
+  const [settling, setSettling] = useState(false);
+
+  const [settlements, setSettlements] = useState([]);
+  const [loadingSettlements, setLoadingSettlements] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (activeTab === 'Settlements') {
+        fetchSettlements();
+      }
+    }, [activeTab])
+  );
+
+  const fetchSettlements = async () => {
+    setLoadingSettlements(true);
+    try {
+      const res = await api.get(`/settlements?userId=${person.userId}`);
+      setSettlements(res.data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingSettlements(false);
+    }
+  };
 
   const owedToYou = person.net > 0;
   const amt = Math.abs(person.net).toFixed(2);
@@ -25,6 +56,50 @@ export default function PersonBalanceDetailScreen({ route, navigation }) {
     if (n.includes('home')) return <Home color="#3182CE" size={22} />;
     if (n.includes('couple')) return <Heart color="#E53E3E" size={22} />;
     return <Globe color="#718096" size={22} />;
+  };
+
+  const confirmSettle = async () => {
+    if (!settleAmount || isNaN(settleAmount) || parseFloat(settleAmount) <= 0) {
+      Alert.alert('Error', 'Enter a valid amount');
+      return;
+    }
+    setSettling(true);
+    try {
+      const isOwed = settleModal.net > 0;
+      await api.post(`/groups/${settleModal.groupId}/settlements`, {
+        paid_by: isOwed ? person.userId : user.id,
+        paid_to: isOwed ? user.id : person.userId,
+        amount: parseFloat(settleAmount),
+      });
+      setSettleModal(null);
+      if (activeTab === 'Settlements') fetchSettlements();
+      Alert.alert('✅ Settled!', `Payment of \u20b9${settleAmount} recorded successfully.`);
+    } catch (e) {
+      Alert.alert('Error', e.response?.data?.error || 'Failed to record settlement');
+    } finally {
+      setSettling(false);
+    }
+  };
+
+  const handleUPIPayment = async () => {
+    if (!settleAmount || isNaN(settleAmount) || parseFloat(settleAmount) <= 0) {
+      Alert.alert('Error', 'Enter a valid amount');
+      return;
+    }
+    const upiId = person.upi_id;
+    if (!upiId) {
+      Alert.alert('No UPI ID', `${person.name} has not added their UPI ID.`);
+      return;
+    }
+    const amount = parseFloat(settleAmount).toFixed(2);
+    const upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(person.name)}&am=${amount}&cu=INR`;
+    try {
+      const supported = await Linking.canOpenURL(upiUrl);
+      if (supported) await Linking.openURL(upiUrl);
+      else Alert.alert('Error', 'No UPI app found on your phone.');
+    } catch (e) {
+      Alert.alert('Error', 'Could not open UPI app.');
+    }
   };
 
   return (
@@ -124,12 +199,23 @@ export default function PersonBalanceDetailScreen({ route, navigation }) {
                         </Text>
                       </View>
                       <View style={styles.groupCardDivider} />
-                      <TouchableOpacity
-                        style={styles.groupRemindBtn}
-                        onPress={() => Alert.alert('Remind', `Reminder sent to ${person.name} for ${group.groupName}!`)}
-                      >
-                        <Text style={styles.groupRemindBtnText}>Remind</Text>
-                      </TouchableOpacity>
+                      <View style={{ flexDirection: 'row', gap: 12 }}>
+                        <TouchableOpacity
+                          style={[styles.groupRemindBtn, { flex: 1 }]}
+                          onPress={() => Alert.alert('Remind', `Reminder sent to ${person.name} for ${group.groupName}!`)}
+                        >
+                          <Text style={styles.groupRemindBtnText}>Remind</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.groupSettleBtn, { flex: 1 }]}
+                          onPress={() => {
+                            setSettleAmount(groupAmt);
+                            setSettleModal(group);
+                          }}
+                        >
+                          <Text style={styles.groupSettleBtnText}>Settle Up</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   );
                 })
@@ -145,10 +231,87 @@ export default function PersonBalanceDetailScreen({ route, navigation }) {
       )}
 
       {activeTab === 'Settlements' && (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No settlements yet</Text>
-        </View>
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {loadingSettlements ? (
+            <ActivityIndicator size="large" color="#5A67D8" style={{ marginTop: 40 }} />
+          ) : settlements.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>No settlements yet</Text>
+            </View>
+          ) : (
+            settlements.map((s, idx) => {
+              const isYouPaid = s.paid_by === user.id;
+              const dateObj = new Date(s.created_at);
+              const dateStr = dateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+              return (
+                <View key={s.id || idx} style={styles.settlementCard}>
+                  <View style={styles.settlementIcon}>
+                    <Text style={{ fontSize: 20 }}>💸</Text>
+                  </View>
+                  <View style={styles.settlementInfo}>
+                    <Text style={styles.settlementTitle}>
+                      {isYouPaid ? `You paid ${s.payee_name}` : `${s.payer_name} paid you`}
+                    </Text>
+                    <Text style={styles.settlementDate}>{dateStr} • {s.group_name}</Text>
+                  </View>
+                  <Text style={[styles.settlementAmount, { color: isYouPaid ? '#1E2340' : '#10B981' }]}>
+                    ₹{parseFloat(s.amount).toFixed(0)}
+                  </Text>
+                </View>
+              );
+            })
+          )}
+          <View style={{ height: 40 }} />
+        </ScrollView>
       )}
+
+      {/* Settle Up Modal */}
+      <Modal visible={!!settleModal} transparent animationType="slide" onRequestClose={() => setSettleModal(null)}>
+        <TouchableOpacity style={styles.settleModalBackdrop} activeOpacity={1} onPress={() => setSettleModal(null)} />
+        <View style={styles.settleModalSheet}>
+          <View style={styles.settleModalPill} />
+          <Text style={styles.settleModalTitle}>Record Settlement</Text>
+          <Text style={styles.settleModalSub}>
+            {settleModal?.net > 0 ? `${person.name} → Aap` : `Aap → ${person.name}`}
+          </Text>
+          <View style={styles.settleModalAmountRow}>
+            <Text style={styles.settleModalCurrency}>₹</Text>
+            <TextInput
+              style={styles.settleModalInput}
+              keyboardType="numeric"
+              value={settleAmount}
+              onChangeText={setSettleAmount}
+              placeholder="0"
+              placeholderTextColor="#A0AEC0"
+            />
+          </View>
+          
+          <View style={{ flexDirection: 'row', gap: 12, width: '100%', marginBottom: 16 }}>
+            <TouchableOpacity
+              style={[styles.settleModalBtn, { flex: 1, backgroundColor: '#EDF2F7' }, settling && { opacity: 0.7 }]}
+              onPress={confirmSettle}
+              disabled={settling}
+            >
+              {settling
+                ? <ActivityIndicator color="#5A67D8" />
+                : <Text style={[styles.settleModalBtnText, { color: '#4A5568' }]}>Already Paid</Text>
+              }
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.settleModalBtn, { flex: 1, backgroundColor: '#10B981' }, (settleModal?.net > 0) && { opacity: 0.5 }]}
+              onPress={handleUPIPayment}
+              disabled={settleModal?.net > 0} // Can't pay them if they owe you
+            >
+              <Text style={styles.settleModalBtnText}>Pay via UPI</Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity style={styles.settleModalCancel} onPress={() => setSettleModal(null)}>
+            <Text style={styles.settleModalCancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -265,7 +428,45 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   groupRemindBtnText: { fontSize: 14, fontWeight: '700', color: '#10B981' },
+  groupSettleBtn: {
+    backgroundColor: '#5A67D8',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  groupSettleBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
 
   emptyState: { flex: 1, alignItems: 'center', paddingTop: 60 },
   emptyText: { fontSize: 15, color: colors.textSecondary },
+
+  settlementCard: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
+    padding: 16, borderRadius: 16, marginBottom: 12,
+    borderWidth: 1, borderColor: colors.borderLight,
+  },
+  settlementIcon: {
+    width: 44, height: 44, borderRadius: 14, backgroundColor: '#F0FFF4',
+    justifyContent: 'center', alignItems: 'center', marginRight: 12,
+  },
+  settlementInfo: { flex: 1 },
+  settlementTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
+  settlementDate: { fontSize: 13, color: colors.textSecondary },
+  settlementAmount: { fontSize: 16, fontWeight: '800' },
+
+  settleModalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  settleModalSheet: {
+    backgroundColor: '#fff', borderTopLeftRadius: 32, borderTopRightRadius: 32,
+    padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    position: 'absolute', bottom: 0, width: '100%', alignItems: 'center',
+  },
+  settleModalPill: { width: 44, height: 5, borderRadius: 3, backgroundColor: '#E2E8F0', marginBottom: 20 },
+  settleModalTitle: { fontSize: 20, fontWeight: '900', color: '#1E2340', marginBottom: 4 },
+  settleModalSub: { fontSize: 14, color: '#718096', marginBottom: 24 },
+  settleModalAmountRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 32 },
+  settleModalCurrency: { fontSize: 32, fontWeight: '800', color: '#1E2340', marginRight: 8 },
+  settleModalInput: { fontSize: 48, fontWeight: '900', color: '#1E2340', minWidth: 120, textAlign: 'center', borderBottomWidth: 3, borderBottomColor: '#5A67D8' },
+  settleModalBtn: { backgroundColor: '#5A67D8', paddingVertical: 16, borderRadius: 16, alignItems: 'center', justifyContent: 'center', height: 56 },
+  settleModalBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  settleModalCancel: { paddingVertical: 12 },
+  settleModalCancelText: { color: '#A0AEC0', fontSize: 15, fontWeight: '600' },
 });
