@@ -8,14 +8,24 @@ export const useAuth = create((set) => ({
   isLoading: true,
   error: null,
 
+  setUser: (user) => set({ user }),
+
   // Initialize: check if we have a token saved
   initAuth: async () => {
     try {
       const token = await AsyncStorage.getItem('auth_token');
       if (token) {
-        // Here we could verify the token with the backend
-        set({ token, isLoading: false });
-        // Optional: fetch user profile
+        // Fetch user profile
+        try {
+          // Set token first so api requests have it
+          set({ token });
+          const res = await api.get('/auth/me');
+          set({ user: res.data.user, isLoading: false });
+        } catch (err) {
+          // If token is invalid
+          set({ token: null, user: null, isLoading: false });
+          await AsyncStorage.removeItem('auth_token');
+        }
       } else {
         set({ isLoading: false });
       }
