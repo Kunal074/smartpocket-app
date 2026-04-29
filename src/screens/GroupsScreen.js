@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, Text, StyleSheet, SafeAreaView, FlatList, 
   TouchableOpacity, Platform, Modal, TextInput, ScrollView
 } from 'react-native';
 import { Users, Plus, Search, ArrowRight, X, Contact as ContactIcon, Globe, Home, Heart, User } from 'lucide-react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import * as Contacts from 'expo-contacts';
 import { colors } from '../theme/colors';
 import { api } from '../api/client';
@@ -20,8 +21,9 @@ export default function GroupsScreen({ navigation }) {
   const [groups, setGroups] = useState([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     const fetchGroups = async () => {
+      setLoadingGroups(true);
       try {
         const { data } = await api.get('/groups');
         setGroups(data);
@@ -32,7 +34,7 @@ export default function GroupsScreen({ navigation }) {
       }
     };
     fetchGroups();
-  }, []);
+  }, []));
 
   const fetchContacts = async () => {
     setLoadingContacts(true);

@@ -270,7 +270,7 @@ export default function DashboardScreen({ navigation }) {
             <TouchableOpacity 
               style={styles.heroStat}
               activeOpacity={0.7}
-              onPress={() => navigation.navigate('SmartSplit', { screen: 'Balances' })}
+              onPress={() => navigation.navigate('MainTabs', { screen: 'SmartSplit', params: { screen: 'Balances' } })}
             >
               <TrendingUp color="#6EE7B7" size={14} />
               <Text style={styles.heroStatLabel}>Aapko Lena Hai</Text>
@@ -280,7 +280,7 @@ export default function DashboardScreen({ navigation }) {
             <TouchableOpacity 
               style={styles.heroStat}
               activeOpacity={0.7}
-              onPress={() => navigation.navigate('SmartSplit', { screen: 'Balances' })}
+              onPress={() => navigation.navigate('MainTabs', { screen: 'SmartSplit', params: { screen: 'Balances' } })}
             >
               <TrendingDown color="#FCA5A5" size={14} />
               <Text style={styles.heroStatLabel}>Aapko Dena Hai</Text>
@@ -302,7 +302,7 @@ export default function DashboardScreen({ navigation }) {
         {/* ── SmartSplit Entry Card ────────────────────── */}
         <TouchableOpacity
           style={styles.smartSplitCard}
-          onPress={() => navigation.navigate('SmartSplit')}
+          onPress={() => navigation.navigate('MainTabs', { screen: 'SmartSplit' })}
           activeOpacity={0.85}
         >
           <LinearGradient
@@ -339,7 +339,7 @@ export default function DashboardScreen({ navigation }) {
             <Text style={styles.quickBtnLabel}>Add Expense</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('SmartSplit', { screen: 'Groups' })}>
+          <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('MainTabs', { screen: 'SmartSplit', params: { screen: 'Groups' } })}>
             <View style={[styles.quickBtnIcon, { backgroundColor: '#F0FDF4' }]}>
               <Users color="#10B981" size={20} />
             </View>
@@ -353,7 +353,7 @@ export default function DashboardScreen({ navigation }) {
             <Text style={styles.quickBtnLabel}>New Group</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('SmartSplit', { screen: 'Balances' })}>
+          <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('MainTabs', { screen: 'SmartSplit', params: { screen: 'Balances' } })}>
             <View style={[styles.quickBtnIcon, { backgroundColor: '#FDF4FF' }]}>
               <Receipt color="#A855F7" size={20} />
             </View>
@@ -411,7 +411,7 @@ export default function DashboardScreen({ navigation }) {
               <Text style={styles.sectionTitle}>Active Groups</Text>
               <TouchableOpacity
                 style={styles.seeAllBtn}
-                onPress={() => navigation.navigate('SmartSplit', { screen: 'Groups' })}
+                onPress={() => navigation.navigate('MainTabs', { screen: 'SmartSplit', params: { screen: 'Groups' } })}
               >
                 <Text style={styles.seeAllText}>See All</Text>
                 <ChevronRight color="#5A67D8" size={14} />

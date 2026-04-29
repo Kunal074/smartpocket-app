@@ -64,8 +64,20 @@ export default function GroupSettingsScreen({ route, navigation }) {
             setDeleting(true);
             try {
               await api.delete(`/groups/${groupId}`);
-              Alert.alert('Success', 'Group deleted');
-              navigation.navigate('SmartSplit', { screen: 'Groups' });
+              // Reset the entire nav stack so GroupsScreen remounts fresh
+              navigation.reset({
+                index: 0,
+                routes: [{
+                  name: 'MainTabs',
+                  state: {
+                    routes: [{
+                      name: 'SmartSplit',
+                      state: { routes: [{ name: 'Groups' }], index: 0 }
+                    }],
+                    index: 1,
+                  }
+                }]
+              });
             } catch (error) {
               console.error(error);
               Alert.alert('Error', error.response?.data?.error || 'Failed to delete group');
