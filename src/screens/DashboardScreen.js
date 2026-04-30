@@ -184,47 +184,72 @@ export default function DashboardScreen({ navigation }) {
     handleAddFriendDirectly(phone);
   };
 
-  const handleScanReceipt = async () => {
-    try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (permissionResult.granted === false) {
-        Alert.alert("Permission required", "You've refused to allow this app to access your photos!");
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        quality: 0.5,
-        base64: true,
-      });
-
-      if (!result.canceled) {
-        setIsLoading(true);
-        try {
-          const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
-          const res = await api.post('/expenses/scan', { base64Image });
-          
-          if (res.data && !res.data.error) {
-            navigation.navigate('AddExpense', {
-              initialAmount: res.data.amount?.toString() || '',
-              initialCategory: res.data.category || 'other',
-              initialNote: res.data.note || 'Receipt Scan',
-              initialDate: res.data.date || new Date().toISOString().slice(0, 10),
-            });
-          } else {
-            Alert.alert('Scan Failed', res.data?.error || 'AI failed to extract details');
-          }
-        } catch (e) {
-          Alert.alert('Scan Failed', e.response?.data?.error || 'Could not parse the receipt.');
-        } finally {
-          setIsLoading(false);
+  const processImage = async (result) => {
+    if (!result.canceled) {
+      setIsLoading(true);
+      try {
+        const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
+        const res = await api.post('/expenses/scan', { base64Image });
+        
+        if (res.data && !res.data.error) {
+          navigation.navigate('AddExpense', {
+            initialAmount: res.data.amount?.toString() || '',
+            initialCategory: res.data.category || 'other',
+            initialNote: res.data.note || 'Receipt Scan',
+            initialDate: res.data.date || new Date().toISOString().slice(0, 10),
+          });
+        } else {
+          Alert.alert('Scan Failed', res.data?.error || 'AI failed to extract details');
         }
+      } catch (e) {
+        Alert.alert('Scan Failed', e.response?.data?.error || 'Could not parse the receipt.');
+      } finally {
+        setIsLoading(false);
       }
-    } catch (e) {
-      console.warn('Image picker error', e);
-      setIsLoading(false);
     }
+  };
+
+  const handleScanReceipt = () => {
+    Alert.alert(
+      'Scan Receipt',
+      'Choose how to scan your bill',
+      [
+        {
+          text: 'Take Photo',
+          onPress: async () => {
+            const perm = await ImagePicker.requestCameraPermissionsAsync();
+            if (!perm.granted) {
+              Alert.alert("Permission required", "Camera access is needed.");
+              return;
+            }
+            const result = await ImagePicker.launchCameraAsync({
+              allowsEditing: true,
+              quality: 0.5,
+              base64: true,
+            });
+            processImage(result);
+          }
+        },
+        {
+          text: 'Choose from Gallery',
+          onPress: async () => {
+            const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!perm.granted) {
+              Alert.alert("Permission required", "Gallery access is needed.");
+              return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              quality: 0.5,
+              base64: true,
+            });
+            processImage(result);
+          }
+        },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
   };
 
   const now = new Date();
