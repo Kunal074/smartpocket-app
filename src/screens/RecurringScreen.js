@@ -2,11 +2,11 @@ import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
   ScrollView, ActivityIndicator, Alert, Modal, TextInput,
-  Platform, Switch
+  Platform, Switch, KeyboardAvoidingView
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, Plus, Trash2, RefreshCw, Calendar, ChevronRight } from 'lucide-react-native';
+import { ArrowLeft, Plus, Trash2, RefreshCw, Calendar, Pencil } from 'lucide-react-native';
 import { api } from '../api/client';
 import { colors } from '../theme/colors';
 
@@ -39,6 +39,8 @@ export default function RecurringScreen({ navigation }) {
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('bills');
   const [frequency, setFrequency] = useState('monthly');
+  const [startDate, setStartDate] = useState('');  // DD/MM/YYYY format
+  const [editingItem, setEditingItem] = useState(null); // null = add mode, object = edit mode
 
   const fetchRecurring = async () => {
     try {
@@ -55,6 +57,18 @@ export default function RecurringScreen({ navigation }) {
     fetchRecurring();
   }, []));
 
+  const handleEdit = (item) => {
+    setEditingItem(item);
+    setNote(item.note);
+    setAmount(String(parseFloat(item.amount).toFixed(0)));
+    setCategory(item.category_id);
+    setFrequency(item.frequency);
+    // Convert next_date YYYY-MM-DD → DD/MM/YYYY for display
+    const parts = item.next_date.slice(0, 10).split('-');
+    setStartDate(`${parts[2]}/${parts[1]}/${parts[0]}`);
+    setShowModal(true);
+  };
+
   const handleAdd = async () => {
     if (!note.trim() || !amount || isNaN(amount)) {
       Alert.alert('Error', 'Please enter a valid name and amount');
@@ -62,16 +76,50 @@ export default function RecurringScreen({ navigation }) {
     }
     setSaving(true);
     try {
-      const today = new Date().toISOString().slice(0, 10);
-      await api.post('/recurring', {
-        note: note.trim(),
-        amount: parseFloat(amount),
-        category_id: category,
-        frequency,
-        start_date: today,
-      });
+      // Parse manually entered date DD/MM/YYYY or default to today
+      let parsedDate = new Date().toISOString().slice(0, 10);
+      if (startDate.trim()) {
+        const parts = startDate.trim().split('/');
+        if (parts.length === 3) {
+          const [dd, mm, yyyy] = parts;
+          const d = new Date(`${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`);
+          if (!isNaN(d.getTime())) {
+            parsedDate = d.toISOString().slice(0, 10);
+          } else {
+            Alert.alert('Invalid Date', 'Please enter date as DD/MM/YYYY');
+            setSaving(false);
+            return;
+          }
+        } else {
+          Alert.alert('Invalid Date', 'Please enter date as DD/MM/YYYY');
+          setSaving(false);
+          return;
+        }
+      }
+
+      if (editingItem) {
+        // EDIT mode
+        await api.patch(`/recurring/${editingItem.id}`, {
+          note: note.trim(),
+          amount: parseFloat(amount),
+          category_id: category,
+          frequency,
+          next_date: parsedDate,
+        });
+      } else {
+        // ADD mode
+        await api.post('/recurring', {
+          note: note.trim(),
+          amount: parseFloat(amount),
+          category_id: category,
+          frequency,
+          start_date: parsedDate,
+        });
+      }
+
       setShowModal(false);
-      setNote(''); setAmount(''); setCategory('bills'); setFrequency('monthly');
+      setEditingItem(null);
+      setNote(''); setAmount(''); setCategory('bills'); setFrequency('monthly'); setStartDate('');
       fetchRecurring();
     } catch (e) {
       Alert.alert('Error', 'Failed to save. Try again.');
@@ -129,7 +177,11 @@ export default function RecurringScreen({ navigation }) {
           <ArrowLeft color="#1E2340" size={24} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Recurring</Text>
-        <TouchableOpacity style={styles.addBtn} onPress={() => setShowModal(true)}>
+        <TouchableOpacity style={styles.addBtn} onPress={() => {
+            setEditingItem(null);
+            setNote(''); setAmount(''); setCategory('bills'); setFrequency('monthly'); setStartDate('');
+            setShowModal(true);
+          }}>
           <Plus color="#fff" size={20} />
         </TouchableOpacity>
       </View>
@@ -184,6 +236,9 @@ export default function RecurringScreen({ navigation }) {
                   <View style={styles.cardRight}>
                     <Text style={[styles.cardAmount, !item.is_active && { color: '#A0AEC0' }]}>₹{parseFloat(item.amount).toFixed(0)}</Text>
                     <View style={styles.cardActions}>
+                      <TouchableOpacity onPress={() => handleEdit(item)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ marginRight: 4 }}>
+                        <Pencil color="#A5B4FC" size={16} />
+                      </TouchableOpacity>
                       <Switch
                         value={item.is_active}
                         onValueChange={() => handleToggle(item.id, item.is_active)}
@@ -205,12 +260,18 @@ export default function RecurringScreen({ navigation }) {
 
       {/* Add Modal */}
       <Modal visible={showModal} animationType="slide" transparent onRequestClose={() => setShowModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Add Recurring Expense</Text>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1, justifyContent: 'flex-end' }}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalSheet}>
+              <View style={styles.modalHandle} />
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
-            <Text style={styles.fieldLabel}>Name / Description</Text>
+              <Text style={styles.modalTitle}>{editingItem ? 'Edit Recurring' : 'Add Recurring Expense'}</Text>
+
+              <Text style={styles.fieldLabel}>Name / Description</Text>
             <TextInput
               style={styles.input}
               placeholder="e.g. Netflix, Gym, Rent"
@@ -259,15 +320,32 @@ export default function RecurringScreen({ navigation }) {
               ))}
             </View>
 
-            <TouchableOpacity style={styles.saveBtn} onPress={handleAdd} disabled={saving}>
-              {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save Recurring</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowModal(false)}>
-              <Text style={styles.cancelBtnText}>Cancel</Text>
-            </TouchableOpacity>
+              <Text style={styles.fieldLabel}>Start / Next Date</Text>
+            <View style={styles.dateInputRow}>
+              <Calendar color="#A0AEC0" size={18} style={{ marginRight: 8 }} />
+              <TextInput
+                style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                placeholder={`Today (${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '/')})`}
+                placeholderTextColor="#A0AEC0"
+                value={startDate}
+                onChangeText={setStartDate}
+                keyboardType="numeric"
+                maxLength={10}
+              />
+            </View>
+            <Text style={{ fontSize: 11, color: '#A0AEC0', marginTop: 4, marginBottom: 16 }}>Format: DD/MM/YYYY — leave blank to start today</Text>
+
+              <TouchableOpacity style={styles.saveBtn} onPress={handleAdd} disabled={saving}>
+                {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save Recurring</Text>}
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowModal(false)}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
-      </Modal>
+      </KeyboardAvoidingView>
+    </Modal>
     </SafeAreaView>
   );
 }
@@ -309,8 +387,8 @@ const styles = StyleSheet.create({
   emptyBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 
   // Modal
-  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
-  modalSheet: { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40 },
+  modalOverlay: { backgroundColor: 'rgba(0,0,0,0.01)' },
+  modalSheet: { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40, maxHeight: '92%' },
   modalHandle: { width: 40, height: 4, backgroundColor: '#E2E8F0', borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
   modalTitle: { fontSize: 20, fontWeight: '800', color: '#1E2340', marginBottom: 20 },
   fieldLabel: { fontSize: 12, fontWeight: '700', color: '#718096', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
@@ -330,4 +408,5 @@ const styles = StyleSheet.create({
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   cancelBtn: { paddingVertical: 14, alignItems: 'center' },
   cancelBtnText: { color: '#718096', fontSize: 15, fontWeight: '600' },
+  dateInputRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8F9FF', borderWidth: 1, borderColor: '#EAECF5', borderRadius: 14, paddingHorizontal: 14 },
 });

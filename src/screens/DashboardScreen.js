@@ -8,7 +8,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   Users, Plus, TrendingUp, TrendingDown, ArrowRight,
-  Wallet, Bell, ChevronRight, Receipt, GitFork, Zap, PieChart, Mic, RefreshCw
+  Wallet, Bell, ChevronRight, Receipt, GitFork, Zap, PieChart, Mic, RefreshCw, Target
 } from 'lucide-react-native';
 import * as Contacts from 'expo-contacts';
 import * as ImagePicker from 'expo-image-picker';
@@ -485,6 +485,13 @@ export default function DashboardScreen({ navigation }) {
               <Receipt color="#10B981" size={20} />
             </View>
             <Text style={styles.quickBtnLabel}>Scan Bill</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('Savings')}>
+            <View style={[styles.quickBtnIcon, { backgroundColor: '#ECFDF5' }]}>
+              <Target color="#10B981" size={20} />
+            </View>
+            <Text style={styles.quickBtnLabel}>Savings</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('MainTabs', { screen: 'SmartSplit', params: { screen: 'Groups' } })}>

@@ -24,6 +24,7 @@ import GroupExpenseHistoryScreen from './src/screens/GroupExpenseHistoryScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import BudgetSetupScreen from './src/screens/BudgetSetupScreen';
 import RecurringScreen from './src/screens/RecurringScreen';
+import SavingsScreen from './src/screens/SavingsScreen';
 import { colors } from './src/theme/colors';
 import { useAuth } from './src/store/useAuth';
 import React, { useEffect } from 'react';
@@ -165,6 +166,7 @@ export default function App() {
             <Stack.Screen name="GroupSettings" component={GroupSettingsScreen} options={{ headerShown: false }} />
             <Stack.Screen name="GroupExpenseHistory" component={GroupExpenseHistoryScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Recurring" component={RecurringScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Savings" component={SavingsScreen} options={{ headerShown: false }} />
           </>
         ) : (
           <>
