@@ -360,13 +360,23 @@ export default function DashboardScreen({ navigation }) {
               <View style={styles.heroBrandDot} />
               <Text style={styles.heroBrandText}>SmartPocket</Text>
             </View>
-            <TouchableOpacity 
-              style={{ backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}
-              onPress={() => navigation.navigate('BudgetSetup')}
-            >
-              <PieChart color="#fff" size={14} />
-              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>Set Budget</Text>
-            </TouchableOpacity>
+            <View style={{ alignItems: 'flex-end', gap: 8 }}>
+              <TouchableOpacity 
+                style={{ backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                onPress={() => navigation.navigate('BudgetSetup')}
+              >
+                <PieChart color="#fff" size={14} />
+                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>Set Budget</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={{ backgroundColor: 'rgba(16,185,129,0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                onPress={() => navigation.navigate('Savings')}
+              >
+                <Target color="#34D399" size={14} />
+                <Text style={{ color: '#34D399', fontSize: 12, fontWeight: '600' }}>Add Savings</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Net Balance */}
@@ -477,7 +487,7 @@ export default function DashboardScreen({ navigation }) {
             <View style={[styles.quickBtnIcon, { backgroundColor: '#EEF2FF' }]}>
               <Plus color="#5A67D8" size={20} />
             </View>
-            <Text style={styles.quickBtnLabel}>Manual</Text>
+            <Text style={styles.quickBtnLabel}>Add Expense</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.quickBtn} onPress={handleScanReceipt}>
@@ -485,20 +495,6 @@ export default function DashboardScreen({ navigation }) {
               <Receipt color="#10B981" size={20} />
             </View>
             <Text style={styles.quickBtnLabel}>Scan Bill</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('Savings')}>
-            <View style={[styles.quickBtnIcon, { backgroundColor: '#ECFDF5' }]}>
-              <Target color="#10B981" size={20} />
-            </View>
-            <Text style={styles.quickBtnLabel}>Savings</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('MainTabs', { screen: 'SmartSplit', params: { screen: 'Groups' } })}>
-            <View style={[styles.quickBtnIcon, { backgroundColor: '#F0FDF4' }]}>
-              <Users color="#10B981" size={20} />
-            </View>
-            <Text style={styles.quickBtnLabel}>Groups</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('Recurring')}>

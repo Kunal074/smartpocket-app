@@ -2,10 +2,13 @@ import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, Platform,
   ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, RefreshControl,
-  Modal, FlatList, Alert
+  Modal, FlatList, Alert, TextInput
 } from 'react-native';
 import { useFocusEffect, useRoute } from '@react-navigation/native';
-import { TrendingUp, TrendingDown, PieChart, BarChart2 } from 'lucide-react-native';
+import { TrendingUp, TrendingDown, PieChart, BarChart2, Download } from 'lucide-react-native';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import * as Print from 'expo-print';
 import { colors } from '../theme/colors';
 import { api } from '../api/client';
 import ExpenseActionModal from '../components/ExpenseActionModal';
@@ -56,6 +59,16 @@ export default function AnalyticsScreen({ route }) {
   const [categoryExpenses, setCategoryExpenses] = useState([]);
   const [loadingCategory, setLoadingCategory] = useState(false);
   const [selectedExpenseForAction, setSelectedExpenseForAction] = useState(null);
+
+  // Export State
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportStartDate, setExportStartDate] = useState(''); // DD/MM/YYYY
+  const [exportEndDate, setExportEndDate] = useState(''); // DD/MM/YYYY
+
+  // AI Insights State
+  const [showInsightsModal, setShowInsightsModal] = useState(false);
+  const [insightsText, setInsightsText] = useState('');
+  const [loadingInsights, setLoadingInsights] = useState(false);
 
   const handleCategoryPress = async (category) => {
     setSelectedCategory(category);
@@ -146,6 +159,168 @@ export default function AnalyticsScreen({ route }) {
   };
   const labels = getLabelForTimeframe();
 
+  const handleExport = () => {
+    // Default to current month start and end dates
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    
+    setExportStartDate(`${String(firstDay.getDate()).padStart(2, '0')}/${String(firstDay.getMonth() + 1).padStart(2, '0')}/${firstDay.getFullYear()}`);
+    setExportEndDate(`${String(lastDay.getDate()).padStart(2, '0')}/${String(lastDay.getMonth() + 1).padStart(2, '0')}/${lastDay.getFullYear()}`);
+    
+    setShowExportModal(true);
+  };
+
+  const parseDateInput = (str) => {
+    const parts = str.trim().split('/');
+    if (parts.length === 3) {
+      const [dd, mm, yyyy] = parts;
+      const d = new Date(`${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`);
+      if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+    }
+    return null;
+  };
+
+  const performExport = async (format) => {
+    const parsedStart = parseDateInput(exportStartDate);
+    const parsedEnd = parseDateInput(exportEndDate);
+
+    if (!parsedStart || !parsedEnd) {
+      Alert.alert('Error', 'Please enter valid dates in DD/MM/YYYY format');
+      return;
+    }
+
+    setLoading(true);
+    setShowExportModal(false);
+    try {
+      const res = await api.get(`/export?startDate=${parsedStart}&endDate=${parsedEnd}`);
+      const exportData = res.data.data || [];
+      
+      if (exportData.length === 0) {
+        Alert.alert('No Data', 'No expenses found for this month to export.');
+        return;
+      }
+
+      if (format === 'csv') {
+        const header = 'Date,Category,Note,Amount\n';
+        const rows = exportData.map(r => `${new Date(r.date).toLocaleDateString('en-IN')},${r.category},"${r.note || ''}",${r.amount}`).join('\n');
+        const csvContent = header + rows;
+        
+        const fileUri = FileSystem.documentDirectory + `SmartPocket_Export_${parsedStart}_to_${parsedEnd}.csv`;
+        await FileSystem.writeAsStringAsync(fileUri, csvContent);
+        
+        const isAvailable = await Sharing.isAvailableAsync();
+        if (isAvailable) {
+          await Sharing.shareAsync(fileUri);
+        } else {
+          Alert.alert('Error', 'Sharing is not available on this device');
+        }
+      } else {
+        // PDF
+        const totalAmount = exportData.reduce((sum, r) => sum + parseFloat(r.amount), 0);
+        
+        let htmlContent = `
+          <html>
+            <head>
+              <style>
+                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; color: #1E2340; }
+                .header { text-align: center; border-bottom: 2px solid #5A67D8; padding-bottom: 20px; margin-bottom: 30px; }
+                .title { font-size: 28px; font-weight: bold; color: #5A67D8; margin: 0; }
+                .subtitle { font-size: 16px; color: #718096; margin-top: 5px; }
+                .summary { display: flex; justify-content: space-between; background-color: #F8F9FF; padding: 20px; border-radius: 12px; margin-bottom: 30px; }
+                .summary-box { text-align: center; }
+                .summary-box .label { font-size: 12px; color: #718096; text-transform: uppercase; letter-spacing: 1px; }
+                .summary-box .value { font-size: 24px; font-weight: bold; color: #1E2340; margin-top: 5px; }
+                table { width: 100%; border-collapse: collapse; }
+                th { text-align: left; padding: 12px; border-bottom: 2px solid #E2E8F0; color: #4A5568; font-size: 14px; }
+                td { padding: 12px; border-bottom: 1px solid #E2E8F0; font-size: 14px; }
+                .amount { font-weight: bold; text-align: right; }
+                th.amount { text-align: right; }
+                .footer { text-align: center; margin-top: 50px; font-size: 12px; color: #A0AEC0; }
+              </style>
+            </head>
+            <body>
+              <div class="header">
+                <h1 class="title">SmartPocket Report</h1>
+                <p class="subtitle">Expense Summary (${exportStartDate} - ${exportEndDate})</p>
+              </div>
+              
+              <div class="summary">
+                <div class="summary-box">
+                  <div class="label">Total Expenses</div>
+                  <div class="value">${exportData.length}</div>
+                </div>
+                <div class="summary-box">
+                  <div class="label">Total Spent</div>
+                  <div class="value">₹${totalAmount.toFixed(2)}</div>
+                </div>
+              </div>
+
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Category</th>
+                    <th>Description</th>
+                    <th class="amount">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${exportData.map(r => `
+                    <tr>
+                      <td>${new Date(r.date).toLocaleDateString('en-IN')}</td>
+                      <td style="text-transform: capitalize;">${r.category}</td>
+                      <td>${r.note || '-'}</td>
+                      <td class="amount">₹${parseFloat(r.amount).toFixed(2)}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+
+              <div class="footer">
+                Generated by SmartPocket • Automated Financial Reporting
+              </div>
+            </body>
+          </html>
+        `;
+
+        const { uri } = await Print.printToFileAsync({ html: htmlContent });
+        const isAvailable = await Sharing.isAvailableAsync();
+        if (isAvailable) {
+          await Sharing.shareAsync(uri);
+        }
+      }
+    } catch (e) {
+      console.warn('Export failed', e);
+      Alert.alert('Export Failed', 'An error occurred while generating the report.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGetInsights = async () => {
+    if (timeframe !== 'month') {
+      Alert.alert('Notice', 'AI Insights are optimized for Monthly views. Please switch to the Month filter.');
+      return;
+    }
+    setLoadingInsights(true);
+    setShowInsightsModal(true);
+    setInsightsText('');
+    try {
+      const now = new Date();
+      const monthStr = String(now.getMonth() + 1).padStart(2, '0');
+      const yearStr = now.getFullYear().toString();
+      
+      const res = await api.get(`/analytics/insights?month=${monthStr}&year=${yearStr}`);
+      setInsightsText(res.data.insights || 'No insights available right now.');
+    } catch (e) {
+      console.warn('Failed to load insights', e);
+      setInsightsText('Sorry, failed to generate insights at this time.');
+    } finally {
+      setLoadingInsights(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -154,7 +329,13 @@ export default function AnalyticsScreen({ route }) {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Analytics</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: 12 }}>
+            <Text style={styles.headerTitle}>Analytics</Text>
+            <TouchableOpacity onPress={handleExport} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#EEF2FF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 }}>
+              <Download color="#5A67D8" size={16} />
+              <Text style={{ color: '#5A67D8', fontSize: 13, fontWeight: '700' }}>Export</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.headerTabs}>
             {['Personal', 'Groups'].map(t => (
               <TouchableOpacity
@@ -185,6 +366,15 @@ export default function AnalyticsScreen({ route }) {
 
         {activeTab === 'Personal' ? (
           <>
+            {/* AI Insights Button */}
+            <TouchableOpacity 
+              style={{ marginHorizontal: 20, marginBottom: 20, backgroundColor: '#8B5CF6', padding: 16, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
+              onPress={handleGetInsights}
+            >
+              <Text style={{ fontSize: 18 }}>✨</Text>
+              <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>Ask AI for Financial Insights</Text>
+            </TouchableOpacity>
+
             {/* This Period vs Last Period */}
             <View style={styles.compRow}>
               <View style={[styles.compCard, { backgroundColor: '#1E2340' }]}>
@@ -312,6 +502,97 @@ export default function AnalyticsScreen({ route }) {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Export Modal */}
+      <Modal visible={showExportModal} animationType="slide" transparent onRequestClose={() => setShowExportModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Export Data</Text>
+            
+            <Text style={{ fontSize: 14, color: '#718096', marginBottom: 16 }}>
+              Select the date range for your export.
+            </Text>
+
+            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.fieldLabel}>Start Date</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="DD/MM/YYYY"
+                  placeholderTextColor="#A0AEC0"
+                  keyboardType="numeric"
+                  maxLength={10}
+                  value={exportStartDate}
+                  onChangeText={setExportStartDate}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.fieldLabel}>End Date</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="DD/MM/YYYY"
+                  placeholderTextColor="#A0AEC0"
+                  keyboardType="numeric"
+                  maxLength={10}
+                  value={exportEndDate}
+                  onChangeText={setExportEndDate}
+                />
+              </View>
+            </View>
+
+            <Text style={styles.fieldLabel}>Choose Format</Text>
+            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+              <TouchableOpacity 
+                style={[styles.saveBtn, { flex: 1, backgroundColor: '#10B981', marginBottom: 0 }]} 
+                onPress={() => performExport('csv')}
+              >
+                <Text style={styles.saveBtnText}>Export CSV</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.saveBtn, { flex: 1, backgroundColor: '#5A67D8', marginBottom: 0 }]} 
+                onPress={() => performExport('pdf')}
+              >
+                <Text style={styles.saveBtnText}>Export PDF</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowExportModal(false)}>
+              <Text style={styles.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* AI Insights Modal */}
+      <Modal visible={showInsightsModal} animationType="slide" transparent onRequestClose={() => setShowInsightsModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>AI Financial Insights ✨</Text>
+            
+            {loadingInsights ? (
+              <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                <ActivityIndicator size="large" color="#8B5CF6" />
+                <Text style={{ marginTop: 16, color: '#718096', fontWeight: '600' }}>Analyzing your spending patterns...</Text>
+              </View>
+            ) : (
+              <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
+                <Text style={{ fontSize: 16, color: '#1E2340', lineHeight: 26, fontWeight: '500' }}>
+                  {insightsText}
+                </Text>
+              </ScrollView>
+            )}
+
+            <TouchableOpacity 
+              style={[styles.saveBtn, { backgroundColor: '#F1F5F9', marginTop: 24, marginBottom: 0 }]} 
+              onPress={() => setShowInsightsModal(false)}
+            >
+              <Text style={[styles.saveBtnText, { color: '#475569' }]}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* ── Details Modal ───────────────────────── */}
       <Modal 
