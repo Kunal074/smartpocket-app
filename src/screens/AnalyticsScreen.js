@@ -315,7 +315,8 @@ export default function AnalyticsScreen({ route }) {
       setInsightsText(res.data.insights || 'No insights available right now.');
     } catch (e) {
       console.warn('Failed to load insights', e);
-      setInsightsText('Sorry, failed to generate insights at this time.');
+      const details = e.response?.data?.details || e.message;
+      setInsightsText(`Sorry, failed to generate insights at this time.\n\nError details: ${details}`);
     } finally {
       setLoadingInsights(false);
     }
@@ -732,5 +733,16 @@ const styles = StyleSheet.create({
   detailInfo: { flex: 1, paddingRight: 16 },
   detailTitle: { fontSize: 16, fontWeight: '700', color: '#1E2340', marginBottom: 4 },
   detailDate: { fontSize: 13, color: '#718096', textTransform: 'capitalize' },
-  detailAmount: { fontSize: 18, fontWeight: '800', color: '#EF4444' }
+  detailAmount: { fontSize: 18, fontWeight: '800', color: '#EF4444' },
+
+  // Bottom Sheet Modal Styles
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  modalSheet: { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40, maxHeight: '90%' },
+  modalHandle: { width: 40, height: 4, backgroundColor: '#E2E8F0', borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
+  fieldLabel: { fontSize: 12, fontWeight: '700', color: '#718096', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  input: { backgroundColor: '#F8F9FF', borderWidth: 1, borderColor: '#EAECF5', borderRadius: 14, padding: 14, fontSize: 16, color: '#1E2340', marginBottom: 16 },
+  saveBtn: { paddingVertical: 16, borderRadius: 16, alignItems: 'center', marginBottom: 10 },
+  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  cancelBtn: { paddingVertical: 14, alignItems: 'center' },
+  cancelBtnText: { color: '#718096', fontSize: 15, fontWeight: '600' }
 });
