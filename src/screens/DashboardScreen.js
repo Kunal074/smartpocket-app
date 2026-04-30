@@ -11,6 +11,7 @@ import {
   Wallet, Bell, ChevronRight, Receipt, GitFork, Zap, PieChart
 } from 'lucide-react-native';
 import * as Contacts from 'expo-contacts';
+import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../theme/colors';
 import ExpenseActionModal from '../components/ExpenseActionModal';
 import { api } from '../api/client';
@@ -181,6 +182,49 @@ export default function DashboardScreen({ navigation }) {
     const phone = contact.phoneNumbers?.[0]?.number?.replace(/\s/g, '');
     if (!phone) { Alert.alert('Error', 'This contact has no phone number'); return; }
     handleAddFriendDirectly(phone);
+  };
+
+  const handleScanReceipt = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (permissionResult.granted === false) {
+        Alert.alert("Permission required", "You've refused to allow this app to access your photos!");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.5,
+        base64: true,
+      });
+
+      if (!result.canceled) {
+        setIsLoading(true);
+        try {
+          const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
+          const res = await api.post('/expenses/scan', { base64Image });
+          
+          if (res.data && !res.data.error) {
+            navigation.navigate('AddExpense', {
+              initialAmount: res.data.amount?.toString() || '',
+              initialCategory: res.data.category || 'other',
+              initialNote: res.data.note || 'Receipt Scan',
+              initialDate: res.data.date || new Date().toISOString().slice(0, 10),
+            });
+          } else {
+            Alert.alert('Scan Failed', res.data?.error || 'AI failed to extract details');
+          }
+        } catch (e) {
+          Alert.alert('Scan Failed', e.response?.data?.error || 'Could not parse the receipt.');
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    } catch (e) {
+      console.warn('Image picker error', e);
+      setIsLoading(false);
+    }
   };
 
   const now = new Date();
@@ -374,12 +418,19 @@ export default function DashboardScreen({ navigation }) {
         </TouchableOpacity>
 
         {/* ── Quick Actions ────────────────────────────── */}
-        <View style={styles.quickActions}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 16 }} style={{ marginBottom: 24 }}>
           <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('AddExpense')}>
             <View style={[styles.quickBtnIcon, { backgroundColor: '#EEF2FF' }]}>
               <Plus color="#5A67D8" size={20} />
             </View>
-            <Text style={styles.quickBtnLabel}>Add Expense</Text>
+            <Text style={styles.quickBtnLabel}>Manual</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.quickBtn} onPress={handleScanReceipt}>
+            <View style={[styles.quickBtnIcon, { backgroundColor: '#ECFDF5' }]}>
+              <Receipt color="#10B981" size={20} />
+            </View>
+            <Text style={styles.quickBtnLabel}>Scan Bill</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('MainTabs', { screen: 'SmartSplit', params: { screen: 'Groups' } })}>
@@ -402,7 +453,7 @@ export default function DashboardScreen({ navigation }) {
             </View>
             <Text style={styles.quickBtnLabel}>Balances</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
 
         {/* ── Udhaar (Direct Balances) ─────────────────── */}
         <View style={styles.section}>

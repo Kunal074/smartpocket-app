@@ -7,10 +7,11 @@ import { X, Check } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { api } from '../api/client';
 
-export default function AddExpenseScreen({ navigation }) {
-  const [amount, setAmount] = useState('');
-  const [note, setNote] = useState('');
-  const [category, setCategory] = useState('food'); // Default category
+export default function AddExpenseScreen({ route, navigation }) {
+  const [amount, setAmount] = useState(route.params?.initialAmount || '');
+  const [note, setNote] = useState(route.params?.initialNote || '');
+  const [category, setCategory] = useState(route.params?.initialCategory || 'food');
+  const [date, setDate] = useState(route.params?.initialDate || new Date().toISOString().slice(0, 10));
   const [isLoading, setIsLoading] = useState(false);
 
   const categories = [
@@ -33,7 +34,7 @@ export default function AddExpenseScreen({ navigation }) {
         amount: parseFloat(amount),
         categoryId: category,          // backend expects camelCase
         note: note || 'Expense',
-        date: new Date().toISOString().slice(0, 10)  // send YYYY-MM-DD only
+        date: date  // send extracted date or today
       });
       
       navigation.goBack();
