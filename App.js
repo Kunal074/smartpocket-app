@@ -23,6 +23,7 @@ import GroupSettingsScreen from './src/screens/GroupSettingsScreen';
 import GroupExpenseHistoryScreen from './src/screens/GroupExpenseHistoryScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import BudgetSetupScreen from './src/screens/BudgetSetupScreen';
+import RecurringScreen from './src/screens/RecurringScreen';
 import { colors } from './src/theme/colors';
 import { useAuth } from './src/store/useAuth';
 import React, { useEffect } from 'react';
@@ -163,6 +164,7 @@ export default function App() {
             <Stack.Screen name="GroupChat" component={GroupChatScreen} options={{ headerShown: false }} />
             <Stack.Screen name="GroupSettings" component={GroupSettingsScreen} options={{ headerShown: false }} />
             <Stack.Screen name="GroupExpenseHistory" component={GroupExpenseHistoryScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Recurring" component={RecurringScreen} options={{ headerShown: false }} />
           </>
         ) : (
           <>

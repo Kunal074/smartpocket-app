@@ -1,14 +1,14 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   SafeAreaView, Platform, ActivityIndicator, Alert, Dimensions, TextInput,
-  KeyboardAvoidingView, Modal, FlatList
+  KeyboardAvoidingView, Modal, FlatList, Animated
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   Users, Plus, TrendingUp, TrendingDown, ArrowRight,
-  Wallet, Bell, ChevronRight, Receipt, GitFork, Zap, PieChart
+  Wallet, Bell, ChevronRight, Receipt, GitFork, Zap, PieChart, Mic, RefreshCw
 } from 'lucide-react-native';
 import * as Contacts from 'expo-contacts';
 import * as ImagePicker from 'expo-image-picker';
@@ -32,6 +32,9 @@ export default function DashboardScreen({ navigation }) {
   const [friends, setFriends] = useState([]);
   const [analyticsData, setAnalyticsData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showAIModal, setShowAIModal] = useState(false);
+  const [aiInput, setAiInput] = useState('');
+  const [isAIParsing, setIsAIParsing] = useState(false);
 
   // Udhaar Modal State
   const [showUdhaarModal, setShowUdhaarModal] = useState(false);
@@ -98,6 +101,8 @@ export default function DashboardScreen({ navigation }) {
         }
       };
       fetchAll();
+      // Auto-process any due recurring expenses silently
+      api.post('/recurring/process').catch(() => {});
       return () => { isActive = false; };
     }, [logout])
   );
@@ -182,6 +187,30 @@ export default function DashboardScreen({ navigation }) {
     const phone = contact.phoneNumbers?.[0]?.number?.replace(/\s/g, '');
     if (!phone) { Alert.alert('Error', 'This contact has no phone number'); return; }
     handleAddFriendDirectly(phone);
+  };
+
+  const handleAIParse = async () => {
+    if (!aiInput.trim()) return;
+    setIsAIParsing(true);
+    try {
+      const res = await api.post('/expenses/voice', { text: aiInput.trim() });
+      if (res.data && !res.data.error) {
+        setShowAIModal(false);
+        setAiInput('');
+        navigation.navigate('AddExpense', {
+          initialAmount: res.data.amount?.toString() || '',
+          initialCategory: res.data.category || 'other',
+          initialNote: res.data.note || 'AI Expense',
+          initialDate: res.data.date || new Date().toISOString().slice(0, 10),
+        });
+      } else {
+        Alert.alert('Parse Failed', res.data?.error || 'AI could not understand that.');
+      }
+    } catch (e) {
+      Alert.alert('Parse Failed', e.response?.data?.error || 'Could not process.');
+    } finally {
+      setIsAIParsing(false);
+    }
   };
 
   const processImage = async (result) => {
@@ -463,6 +492,13 @@ export default function DashboardScreen({ navigation }) {
               <Users color="#10B981" size={20} />
             </View>
             <Text style={styles.quickBtnLabel}>Groups</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('Recurring')}>
+            <View style={[styles.quickBtnIcon, { backgroundColor: '#FFF7ED' }]}>
+              <RefreshCw color="#F59E0B" size={20} />
+            </View>
+            <Text style={styles.quickBtnLabel}>Recurring</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('CreateGroup')}>
