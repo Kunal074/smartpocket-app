@@ -8,7 +8,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   Users, Plus, TrendingUp, TrendingDown, ArrowRight,
-  Wallet, Bell, ChevronRight, Receipt, GitFork, Zap
+  Wallet, Bell, ChevronRight, Receipt, GitFork, Zap, PieChart
 } from 'lucide-react-native';
 import * as Contacts from 'expo-contacts';
 import { colors } from '../theme/colors';
@@ -29,6 +29,7 @@ export default function DashboardScreen({ navigation }) {
   const [balanceData, setBalanceData] = useState(null);
   const [groups, setGroups] = useState([]);
   const [friends, setFriends] = useState([]);
+  const [analyticsData, setAnalyticsData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Udhaar Modal State
@@ -74,11 +75,12 @@ export default function DashboardScreen({ navigation }) {
       let isActive = true;
       const fetchAll = async () => {
         try {
-          const [expRes, balRes, grpRes, friendsRes] = await Promise.all([
+          const [expRes, balRes, grpRes, friendsRes, analyticsRes] = await Promise.all([
             api.get('/expenses'),
             api.get('/balances').catch(() => ({ data: { owedToYou: 0, youOwe: 0, totalNetBalance: 0, byPerson: [] } })),
             api.get('/groups').catch(() => ({ data: [] })),
             api.get('/friends').catch(() => ({ data: [] })),
+            api.get('/analytics?timeframe=month').catch(() => ({ data: null }))
           ]);
           if (isActive) {
             const list = expRes.data.expenses ?? (Array.isArray(expRes.data) ? expRes.data : []);
@@ -86,6 +88,7 @@ export default function DashboardScreen({ navigation }) {
             setBalanceData(balRes.data);
             setGroups(grpRes.data.slice(0, 3));
             setFriends(friendsRes.data || []);
+            setAnalyticsData(analyticsRes.data);
           }
         } catch (error) {
           if (error.response?.status === 401 && isActive) logout();
@@ -253,10 +256,19 @@ export default function DashboardScreen({ navigation }) {
           end={{ x: 1, y: 1 }}
           style={styles.heroCard}
         >
-          {/* Brand label */}
-          <View style={styles.heroBrand}>
-            <View style={styles.heroBrandDot} />
-            <Text style={styles.heroBrandText}>SmartPocket</Text>
+          {/* Brand label & Budget Button */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <View style={styles.heroBrand}>
+              <View style={styles.heroBrandDot} />
+              <Text style={styles.heroBrandText}>SmartPocket</Text>
+            </View>
+            <TouchableOpacity 
+              style={{ backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+              onPress={() => navigation.navigate('BudgetSetup')}
+            >
+              <PieChart color="#fff" size={14} />
+              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>Set Budget</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Net Balance */}
@@ -298,6 +310,37 @@ export default function DashboardScreen({ navigation }) {
             </TouchableOpacity>
           </View>
         </LinearGradient>
+
+        {/* ── Budget Warning Banner ────────────────────── */}
+        {(() => {
+          if (!analyticsData?.byCategory) return null;
+          const warningCategories = analyticsData.byCategory.filter(c => c.budget && (c.total / c.budget) >= 0.8);
+          if (warningCategories.length === 0) return null;
+          
+          warningCategories.sort((a, b) => (b.total / b.budget) - (a.total / a.budget));
+          const topWarning = warningCategories[0];
+          const pct = Math.min((topWarning.total / topWarning.budget) * 100, 100).toFixed(0);
+          const isOver = topWarning.total > topWarning.budget;
+
+          return (
+            <TouchableOpacity 
+              style={{ backgroundColor: isOver ? '#FEF2F2' : '#FFFBEB', marginHorizontal: 20, marginBottom: 20, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: isOver ? '#FECACA' : '#FEF3C7', flexDirection: 'row', alignItems: 'center', gap: 12 }}
+              onPress={() => navigation.navigate('Analytics')}
+            >
+              <View style={{ backgroundColor: isOver ? '#FEE2E2' : '#FEF3C7', padding: 8, borderRadius: 10 }}>
+                <Bell color={isOver ? '#EF4444' : '#F59E0B'} size={20} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: isOver ? '#B91C1C' : '#D97706', marginBottom: 2 }}>
+                  {isOver ? 'Budget Exceeded!' : 'Nearing Budget Limit'}
+                </Text>
+                <Text style={{ fontSize: 12, color: isOver ? '#991B1B' : '#B45309' }}>
+                  You've used {pct}% of your {topWarning.category} budget (₹{topWarning.total.toFixed(0)} of ₹{topWarning.budget}).
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })()}
 
         {/* ── SmartSplit Entry Card ────────────────────── */}
         <TouchableOpacity

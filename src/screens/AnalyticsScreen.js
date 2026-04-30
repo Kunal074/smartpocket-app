@@ -241,7 +241,19 @@ export default function AnalyticsScreen({ route }) {
               ) : (
                 byCategory.map((cat, i) => {
                   const meta = CATEGORY_META[cat.category] || CATEGORY_META.other;
-                  const pct = categoryTotal > 0 ? ((cat.total / categoryTotal) * 100).toFixed(0) : 0;
+                  const hasBudget = cat.budget && cat.budget > 0;
+                  
+                  let pct = 0;
+                  let isOver = false;
+                  if (hasBudget) {
+                    pct = Math.min((cat.total / cat.budget) * 100, 100).toFixed(0);
+                    isOver = cat.total > cat.budget;
+                  } else {
+                    pct = categoryTotal > 0 ? ((cat.total / categoryTotal) * 100).toFixed(0) : 0;
+                  }
+
+                  const barColor = isOver ? '#EF4444' : meta.color;
+                  
                   return (
                     <TouchableOpacity 
                       key={i} 
@@ -251,12 +263,15 @@ export default function AnalyticsScreen({ route }) {
                     >
                       <View style={[styles.catDot, { backgroundColor: meta.color }]} />
                       <Text style={styles.catIcon}>{meta.icon}</Text>
-                      <Text style={styles.catName}>{cat.category.charAt(0).toUpperCase() + cat.category.slice(1)}</Text>
-                      <View style={styles.catBarBg}>
-                        <View style={[styles.catBarFill, { width: `${pct}%`, backgroundColor: meta.color }]} />
+                      <View style={{ width: 80 }}>
+                        <Text style={styles.catName}>{cat.category.charAt(0).toUpperCase() + cat.category.slice(1)}</Text>
+                        {hasBudget ? <Text style={{ fontSize: 9, color: '#718096', fontWeight: '600', marginTop: 2 }}>Limit: ₹{cat.budget}</Text> : null}
                       </View>
-                      <Text style={styles.catPct}>{pct}%</Text>
-                      <Text style={styles.catAmount}>₹{cat.total.toFixed(0)}</Text>
+                      <View style={styles.catBarBg}>
+                        <View style={[styles.catBarFill, { width: `${pct}%`, backgroundColor: barColor }]} />
+                      </View>
+                      <Text style={[styles.catPct, isOver && { color: '#EF4444', fontWeight: '700' }]}>{pct}%</Text>
+                      <Text style={[styles.catAmount, isOver && { color: '#EF4444' }]}>₹{cat.total.toFixed(0)}</Text>
                     </TouchableOpacity>
                   );
                 })

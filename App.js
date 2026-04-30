@@ -22,6 +22,7 @@ import GroupChatScreen from './src/screens/GroupChatScreen';
 import GroupSettingsScreen from './src/screens/GroupSettingsScreen';
 import GroupExpenseHistoryScreen from './src/screens/GroupExpenseHistoryScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import BudgetSetupScreen from './src/screens/BudgetSetupScreen';
 import { colors } from './src/theme/colors';
 import { useAuth } from './src/store/useAuth';
 import React, { useEffect } from 'react';
@@ -152,6 +153,7 @@ export default function App() {
         {token ? (
           <>
             <Stack.Screen name="MainTabs" component={BottomTabs} />
+            <Stack.Screen name="BudgetSetup" component={BudgetSetupScreen} options={{ presentation: 'modal' }} />
             <Stack.Screen name="AddExpense" component={AddExpenseScreen} options={{ presentation: 'modal' }} />
             <Stack.Screen name="CreateGroup" component={CreateGroupScreen} options={{ presentation: 'modal' }} />
             <Stack.Screen name="GroupDetail" component={GroupDetailScreen} />

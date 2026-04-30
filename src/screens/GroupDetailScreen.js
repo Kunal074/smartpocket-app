@@ -24,6 +24,7 @@ export default function GroupDetailScreen({ route, navigation }) {
   const [group, setGroup] = useState(null);
   const [expenses, setExpenses] = useState([]);
   const [balances, setBalances] = useState([]);
+  const [rawBalances, setRawBalances] = useState([]);
   const [netBalances, setNetBalances] = useState([]);
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -49,6 +50,17 @@ export default function GroupDetailScreen({ route, navigation }) {
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [memberEmail, setMemberEmail] = useState('');
 
+  const displayBalances = simplifyOn ? balances : rawBalances;
+
+  const myNetBalance = displayBalances.reduce((acc, b) => {
+    if (b.from?.id === user?.id) return acc - parseFloat(b.amount);
+    if (b.to?.id === user?.id) return acc + parseFloat(b.amount);
+    return acc;
+  }, 0);
+
+  const myBalances = displayBalances.filter(b => b.from?.id === user?.id || b.to?.id === user?.id);
+  const otherBalances = displayBalances.filter(b => b.from?.id !== user?.id && b.to?.id !== user?.id);
+
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
@@ -66,8 +78,10 @@ export default function GroupDetailScreen({ route, navigation }) {
           setGroup(grpRes.data);
           const expList = Array.isArray(expRes.data) ? expRes.data : (expRes.data.expenses ?? []);
           setExpenses(expList);
-          setBalances(balRes.data?.simplifiedDebts ?? []);
-          setNetBalances(balRes.data?.netBalances ?? []);
+          const balData = balRes.data || {};
+          setBalances(balData.simplifiedDebts ?? []);
+          setRawBalances(balData.rawDebts ?? []);
+          setNetBalances(balData.netBalances ?? []);
           setMembers(Array.isArray(memRes.data) ? memRes.data : []);
         } catch (e) {
           console.warn('GroupDetail fetch error:', e.message);
@@ -131,7 +145,7 @@ export default function GroupDetailScreen({ route, navigation }) {
   const handleShare = async () => {
     try {
       const expenseSummary = expenses.map(e => `- ${e.title || e.note}: \u20B9${e.amount} (paid by ${e.paid_by_name || 'you'})`).join('\n');
-      const balanceSummary = balances.map(b => `- ${b.from?.name} owes ${b.to?.name}: \u20B9${b.amount}`).join('\n');
+      const balanceSummary = displayBalances.map(b => `- ${b.from?.name} owes ${b.to?.name}: \u20B9${b.amount}`).join('\n');
       
       const message = `\uD83D\uDCCA *${groupName} Summary*\n\n*Expenses*\n${expenseSummary || 'No expenses yet.'}\n\n*Balances*\n${balanceSummary || 'All settled up!'}`;
       
@@ -260,15 +274,6 @@ export default function GroupDetailScreen({ route, navigation }) {
       </TouchableOpacity>
     </View>
   );
-
-  const myNetBalance = balances.reduce((acc, b) => {
-    if (b.from?.id === user?.id) return acc - parseFloat(b.amount);
-    if (b.to?.id === user?.id) return acc + parseFloat(b.amount);
-    return acc;
-  }, 0);
-
-  const myBalances = balances.filter(b => b.from?.id === user?.id || b.to?.id === user?.id);
-  const otherBalances = balances.filter(b => b.from?.id !== user?.id && b.to?.id !== user?.id);
 
   // --- Summary Tab Computed Data ---
   const groupName = group?.name || routeGroupName;

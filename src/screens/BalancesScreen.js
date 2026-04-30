@@ -139,6 +139,12 @@ export default function BalancesScreen({ navigation }) {
   const willPay = data?.youOwe || 0;
   const willGet = data?.owedToYou || 0;
 
+  const displayedPersons = activeFilter === 'Will Pay' 
+    ? byPerson.filter(p => p.net < 0)
+    : activeFilter === 'Will Get'
+    ? byPerson.filter(p => p.net > 0)
+    : byPerson;
+
   return (
     <SafeAreaView style={styles.safeArea}>
       {/* Header */}
@@ -155,28 +161,44 @@ export default function BalancesScreen({ navigation }) {
       >
         {/* Filter Pill */}
         <View style={styles.filterRow}>
-          <TouchableOpacity style={styles.filterPillActive}>
-            <Text style={styles.filterPillTextActive}>Friends</Text>
+          <TouchableOpacity 
+            style={[styles.filterPillActive, (activeFilter === 'Total' || activeFilter === 'Friends') ? undefined : { backgroundColor: '#E2E8F0' }]}
+            onPress={() => setActiveFilter('Friends')}
+          >
+            <Text style={[styles.filterPillTextActive, (activeFilter === 'Total' || activeFilter === 'Friends') ? undefined : { color: '#64748B' }]}>Friends</Text>
           </TouchableOpacity>
         </View>
 
         {/* Summary Boxes */}
         <View style={styles.summaryRow}>
-          <View style={[styles.summaryBox, styles.summaryBoxDark]}>
+          <TouchableOpacity 
+            style={[styles.summaryBox, styles.summaryBoxDark, (activeFilter === 'Total' || activeFilter === 'Friends') && { borderColor: '#fff', borderWidth: 1 }]}
+            onPress={() => setActiveFilter('Total')}
+            activeOpacity={0.8}
+          >
             <Text style={styles.summaryBoxLabelDark}>Total</Text>
             <Text style={styles.summaryBoxAmountDark}>₹{Math.abs(total).toFixed(2)}</Text>
-          </View>
-          <View style={styles.summaryBox}>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.summaryBox, activeFilter === 'Will Pay' && { backgroundColor: '#FEE2E2', borderRadius: 12 }]}
+            onPress={() => setActiveFilter(f => f === 'Will Pay' ? 'Total' : 'Will Pay')}
+            activeOpacity={0.8}
+          >
             <Text style={styles.summaryBoxLabel}>Will Pay</Text>
             <Text style={[styles.summaryBoxAmount, { color: '#E53E3E' }]}>₹{willPay.toFixed(2)}</Text>
-          </View>
-          <View style={styles.summaryBox}>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.summaryBox, activeFilter === 'Will Get' && { backgroundColor: '#D1FAE5', borderRadius: 12 }]}
+            onPress={() => setActiveFilter(f => f === 'Will Get' ? 'Total' : 'Will Get')}
+            activeOpacity={0.8}
+          >
             <Text style={styles.summaryBoxLabel}>Will Get</Text>
             <Text style={[styles.summaryBoxAmount, { color: '#10B981' }]}>₹{willGet.toFixed(2)}</Text>
-          </View>
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.summaryBox, activeFilter === 'Settled' && { backgroundColor: '#EEF2FF', borderRadius: 12 }]}
-            onPress={() => setActiveFilter(f => f === 'Settled' ? 'Friends' : 'Settled')}
+            onPress={() => setActiveFilter(f => f === 'Settled' ? 'Total' : 'Settled')}
+            activeOpacity={0.8}
           >
             <Text style={[styles.summaryBoxLabel, activeFilter === 'Settled' && { color: '#5A67D8' }]}>Settled</Text>
             <Text style={[styles.summaryBoxAmount, { color: '#5A67D8', fontSize: 14 }]}>{settlements.length}</Text>
@@ -231,13 +253,17 @@ export default function BalancesScreen({ navigation }) {
           )
         ) : (
           // ── Active Balances ──────────────────────────────────────
-          byPerson.length === 0 ? (
+          displayedPersons.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>All settled up! 🎉</Text>
+              <Text style={styles.emptyTitle}>
+                {activeFilter === 'Will Pay' ? 'No payments to make! 🎉' : 
+                 activeFilter === 'Will Get' ? 'No money owed to you. 📭' : 
+                 'All settled up! 🎉'}
+              </Text>
               <Text style={styles.emptySubtitle}>No outstanding balances with anyone.</Text>
             </View>
           ) : (
-            byPerson.map(person => {
+            displayedPersons.map(person => {
               const owedToYou = person.net > 0;
               const amt = Math.abs(person.net).toFixed(0);
               const avatarColor = getAvatarColor(person.name);
