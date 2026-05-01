@@ -13,6 +13,7 @@ const CATEGORY_TABS = ['All', 'Home', 'Trip', 'Couple', 'Personal', 'Other'];
 
 export default function GroupsScreen({ navigation }) {
   const [search, setSearch] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
   const [showAddFriend, setShowAddFriend] = useState(false);
   const [contacts, setContacts] = useState([]);
@@ -156,11 +157,40 @@ export default function GroupsScreen({ navigation }) {
             <TouchableOpacity onPress={() => navigation.navigate('CreateGroup')}>
               <Text style={styles.createGroupText}>Create a group</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.searchIconBtn}>
-              <Search color="#5A67D8" size={18} />
+            <TouchableOpacity
+              style={[styles.searchIconBtn, showSearch && { backgroundColor: '#EEF2FF' }]}
+              onPress={() => {
+                setShowSearch(v => !v);
+                if (showSearch) setSearch('');
+              }}
+            >
+              {showSearch
+                ? <X color="#5A67D8" size={18} />
+                : <Search color="#5A67D8" size={18} />}
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Search Input — toggled */}
+        {showSearch && (
+          <View style={styles.searchBarContainer}>
+            <Search color="#A0AEC0" size={16} style={{ marginRight: 8 }} />
+            <TextInput
+              style={styles.searchBarInput}
+              placeholder="Search groups..."
+              placeholderTextColor="#A0AEC0"
+              value={search}
+              onChangeText={setSearch}
+              autoFocus
+              returnKeyType="search"
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch('')}>
+                <X color="#A0AEC0" size={16} />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         {/* Categories */}
         <View style={styles.categoriesContainer}>
@@ -289,6 +319,20 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.borderLight,
     paddingBottom: 16,
+  },
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EEF2FF',
+    marginBottom: 16,
+    paddingHorizontal: 14,
+    height: 44,
+    borderRadius: 12,
+  },
+  searchBarInput: {
+    flex: 1,
+    fontSize: 15,
+    color: '#1E2340',
   },
   categoryBtn: {
     paddingVertical: 8,

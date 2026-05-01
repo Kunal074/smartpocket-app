@@ -383,9 +383,6 @@ export default function GroupDetailScreen({ route, navigation }) {
                     value={searchQuery}
                     onChangeText={setSearchQuery}
                   />
-                  <View style={styles.premiumTag}>
-                    <Text style={styles.premiumTagText}>PREMIUM</Text>
-                  </View>
                 </View>
               )}
               {/* Balance Tab Header Content */}

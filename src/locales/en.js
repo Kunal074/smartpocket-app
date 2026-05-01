@@ -5,7 +5,7 @@ export default {
     view_groups: "View your group expenses & settlements",
     quick_actions: "Quick Actions",
     set_budget: "Set Budget",
-    savings: "Savings",
+    savings: "Add Savings",
     scan_bill: "Scan Bill",
     add_expense: "Add Expense",
     recurring: "Recurring",

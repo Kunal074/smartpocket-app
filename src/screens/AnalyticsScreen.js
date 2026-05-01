@@ -34,8 +34,13 @@ export default function AnalyticsScreen({ route }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState('Personal'); // Personal | Groups
-  const [timeframe, setTimeframe] = useState(initialTimeframe); // week | month | year
+  const [activeTab, setActiveTab] = useState('Personal');
+  const [timeframe, setTimeframe] = useState(initialTimeframe);
+
+  // Custom date range state
+  const [customStartDate, setCustomStartDate] = useState(''); // DD/MM/YYYY
+  const [customEndDate, setCustomEndDate] = useState('');     // DD/MM/YYYY
+  const [showCustomDateModal, setShowCustomDateModal] = useState(false);
 
   useEffect(() => {
     if (route?.params?.filter) {
@@ -43,9 +48,24 @@ export default function AnalyticsScreen({ route }) {
     }
   }, [route?.params?.filter]);
 
+  // Helper: parse DD/MM/YYYY → YYYY-MM-DD
+  const parseDate = (str) => {
+    const parts = str.trim().split('/');
+    if (parts.length !== 3) return null;
+    const [dd, mm, yyyy] = parts;
+    const d = new Date(`${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`);
+    return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+  };
+
   const fetchAnalytics = useCallback(async () => {
     try {
-      const res = await api.get(`/analytics?timeframe=${timeframe}`);
+      let url = `/analytics?timeframe=${timeframe}`;
+      if (timeframe === 'custom' && customStartDate && customEndDate) {
+        const s = parseDate(customStartDate);
+        const e = parseDate(customEndDate);
+        if (s && e) url = `/analytics?timeframe=month&startDate=${s}&endDate=${e}`;
+      }
+      const res = await api.get(url);
       setData(res.data);
     } catch (e) {
       console.warn('Failed to fetch analytics', e);
@@ -53,7 +73,7 @@ export default function AnalyticsScreen({ route }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [timeframe]);
+  }, [timeframe, customStartDate, customEndDate]);
 
   // Details Modal State
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -301,24 +321,35 @@ export default function AnalyticsScreen({ route }) {
   };
 
   const handleGetInsights = async () => {
-    if (timeframe !== 'month') {
-      Alert.alert('Notice', 'AI Insights are optimized for Monthly views. Please switch to the Month filter.');
-      return;
-    }
     setLoadingInsights(true);
     setShowInsightsModal(true);
     setInsightsText('');
     try {
-      const now = new Date();
-      const monthStr = String(now.getMonth() + 1).padStart(2, '0');
-      const yearStr = now.getFullYear().toString();
-      
-      const res = await api.get(`/analytics/insights?month=${monthStr}&year=${yearStr}&lang=${language}`);
+      let url;
+      if (timeframe === 'custom' && customStartDate && customEndDate) {
+        const s = parseDate(customStartDate);
+        const e = parseDate(customEndDate);
+        if (s && e) {
+          url = `/analytics/insights?startDate=${s}&endDate=${e}&lang=${language}`;
+        } else {
+          setInsightsText('Invalid custom dates. Please use DD/MM/YYYY format.');
+          return;
+        }
+      } else {
+        if (timeframe !== 'month') {
+          Alert.alert('Notice', 'AI Insights work best for monthly or custom date views.');
+        }
+        const now = new Date();
+        const monthStr = String(now.getMonth() + 1).padStart(2, '0');
+        const yearStr = now.getFullYear().toString();
+        url = `/analytics/insights?month=${monthStr}&year=${yearStr}&lang=${language}`;
+      }
+      const res = await api.get(url);
       setInsightsText(res.data.insights || 'No insights available right now.');
     } catch (e) {
       console.warn('Failed to load insights', e);
       const details = e.response?.data?.details || e.message;
-      setInsightsText(`Sorry, failed to generate insights at this time.\n\nError details: ${details}`);
+      setInsightsText(`Sorry, failed to generate insights at this time.\n\nError: ${details}`);
     } finally {
       setLoadingInsights(false);
     }
@@ -354,18 +385,39 @@ export default function AnalyticsScreen({ route }) {
 
         {/* Timeframe Filter */}
         <View style={styles.filterContainer}>
-          {['week', 'month', 'year'].map(tf => (
+          {['week', 'month', 'year', 'custom'].map(tf => (
             <TouchableOpacity
               key={tf}
               style={[styles.filterBtn, timeframe === tf && styles.filterBtnActive]}
-              onPress={() => setTimeframe(tf)}
+              onPress={() => {
+                if (tf === 'custom') {
+                  const now = new Date();
+                  const firstDay = `01/${String(now.getMonth() + 1).padStart(2,'0')}/${now.getFullYear()}`;
+                  const lastDay = `${String(new Date(now.getFullYear(), now.getMonth()+1, 0).getDate()).padStart(2,'0')}/${String(now.getMonth() + 1).padStart(2,'0')}/${now.getFullYear()}`;
+                  if (!customStartDate) setCustomStartDate(firstDay);
+                  if (!customEndDate) setCustomEndDate(lastDay);
+                  setShowCustomDateModal(true);
+                }
+                setTimeframe(tf);
+              }}
             >
               <Text style={[styles.filterText, timeframe === tf && styles.filterTextActive]}>
-                {tf.charAt(0).toUpperCase() + tf.slice(1)}
+                {tf === 'custom' ? '📅 Custom' : tf.charAt(0).toUpperCase() + tf.slice(1)}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
+
+        {/* Custom Date Range Label */}
+        {timeframe === 'custom' && customStartDate && customEndDate && (
+          <TouchableOpacity
+            style={{ marginHorizontal: 20, marginBottom: 12, backgroundColor: '#EEF2FF', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}
+            onPress={() => setShowCustomDateModal(true)}
+          >
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#5A67D8' }}>📅 {customStartDate} → {customEndDate}</Text>
+            <Text style={{ fontSize: 11, color: '#5A67D8', marginLeft: 'auto' }}>Change</Text>
+          </TouchableOpacity>
+        )}
 
         {activeTab === 'Personal' ? (
           <>
@@ -661,6 +713,69 @@ export default function AnalyticsScreen({ route }) {
         onClose={() => setSelectedExpenseForAction(null)}
         onRefresh={() => { setSelectedCategory(null); setSelectedGroup(null); fetchAnalytics(); }}
       />
+
+      {/* ── Custom Date Range Modal ───────────────────── */}
+      <Modal
+        visible={showCustomDateModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowCustomDateModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <Text style={{ fontSize: 20, fontWeight: '800', color: '#1E2340', marginBottom: 20 }}>
+              📅 Custom Date Range
+            </Text>
+            <Text style={styles.fieldLabel}>Start Date (DD/MM/YYYY)</Text>
+            <TextInput
+              style={styles.input}
+              value={customStartDate}
+              onChangeText={setCustomStartDate}
+              placeholder="01/04/2025"
+              placeholderTextColor="#A0AEC0"
+              keyboardType="numeric"
+              maxLength={10}
+            />
+            <Text style={styles.fieldLabel}>End Date (DD/MM/YYYY)</Text>
+            <TextInput
+              style={styles.input}
+              value={customEndDate}
+              onChangeText={setCustomEndDate}
+              placeholder="30/04/2025"
+              placeholderTextColor="#A0AEC0"
+              keyboardType="numeric"
+              maxLength={10}
+            />
+            <TouchableOpacity
+              style={[styles.saveBtn, { backgroundColor: '#5A67D8', marginTop: 8 }]}
+              onPress={() => {
+                const s = parseDate(customStartDate);
+                const e = parseDate(customEndDate);
+                if (!s || !e) {
+                  Alert.alert('Invalid Dates', 'Please enter dates in DD/MM/YYYY format.');
+                  return;
+                }
+                if (new Date(s) > new Date(e)) {
+                  Alert.alert('Invalid Range', 'Start date must be before end date.');
+                  return;
+                }
+                setShowCustomDateModal(false);
+                fetchAnalytics();
+              }}
+            >
+              <Text style={styles.saveBtnText}>Apply & View Analytics</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.cancelBtn}
+              onPress={() => setShowCustomDateModal(false)}
+            >
+              <Text style={styles.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }

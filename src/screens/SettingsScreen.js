@@ -177,7 +177,7 @@ export default function SettingsScreen({ navigation }) {
         <Section title="Account">
           <Row
             icon={<User color="#5A67D8" size={18} />}
-            label="Naam"
+            label="Name"
             value={user?.name}
             noBorder={false}
           />
