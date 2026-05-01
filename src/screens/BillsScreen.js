@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Platform, TouchableOpacity, ScrollView, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, Platform, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, Alert } from 'react-native';
 import { Search, Clock, User, Globe, Plus } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { api } from '../api/client';
@@ -20,7 +20,9 @@ export default function BillsScreen({ navigation }) {
   useEffect(() => {
     if (activeSideTab === 'Non Group') {
       fetchPersonalBills();
-    } else if (activeSideTab !== 'Recent') {
+    } else if (activeSideTab === 'Recent') {
+      fetchRecentBills();
+    } else {
       fetchGroupBills(activeSideTab);
     }
   }, [activeSideTab]);
@@ -39,6 +41,32 @@ export default function BillsScreen({ navigation }) {
     try {
       const res = await api.get('/bills');
       setBills(res.data);
+    } catch (e) {
+      setBills([]);
+    } finally {
+      setLoadingBills(false);
+    }
+  };
+
+  const fetchRecentBills = async () => {
+    setLoadingBills(true);
+    try {
+      const [billsRes, expRes] = await Promise.all([
+        api.get('/bills'),
+        api.get('/expenses')
+      ]);
+      const mappedExpenses = (expRes.data.expenses || []).map(exp => ({
+        id: `exp-${exp.id}`,
+        title: exp.note || 'Expense',
+        amount: exp.amount,
+        category: exp.categoryId || 'other',
+        date: exp.date,
+        created_at: exp.created_at
+      }));
+      const allBills = [...(billsRes.data || []), ...mappedExpenses]
+        .sort((a, b) => new Date(b.date || b.created_at) - new Date(a.date || a.created_at))
+        .slice(0, 30); // Show top 30 recent
+      setBills(allBills);
     } catch (e) {
       setBills([]);
     } finally {
@@ -178,9 +206,17 @@ export default function BillsScreen({ navigation }) {
               style={styles.addExpenseBtn}
               onPress={async () => {
                 if (activeSideTab === 'Non Group') {
-                  navigation.navigate('GroupAddExpense', { members: [], groupId: null, groupName: null });
+                  navigation.navigate('AddExpense', { isBill: true });
                 } else if (activeSideTab === 'Recent') {
-                  alert('Select a group or non-group first!');
+                  Alert.alert(
+                    'Add Expense',
+                    'Where do you want to add this?',
+                    [
+                      { text: 'Personal Bill', onPress: () => navigation.navigate('AddExpense', { isBill: true }) },
+                      { text: 'Personal Expense', onPress: () => navigation.navigate('AddExpense') },
+                      { text: 'Cancel', style: 'cancel' }
+                    ]
+                  );
                 } else {
                   const group = groups.find(g => g.id === activeSideTab);
                   if (group) {

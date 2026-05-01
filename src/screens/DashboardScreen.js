@@ -284,10 +284,13 @@ export default function DashboardScreen({ navigation }) {
   };
 
   const now = new Date();
+  const year = now.getFullYear();
+  const monthStr = String(now.getMonth() + 1).padStart(2, '0');
+  const dayStr = String(now.getDate()).padStart(2, '0');
   const hour = now.getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-  const today = now.toISOString().slice(0, 10);
-  const month = now.toISOString().slice(0, 7);
+  const today = `${year}-${monthStr}-${dayStr}`;
+  const month = `${year}-${monthStr}`;
   const firstName = user?.name?.split(' ')[0] || 'there';
 
   const todaySpend = expenses

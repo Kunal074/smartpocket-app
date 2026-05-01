@@ -12,8 +12,16 @@ export default function AddExpenseScreen({ route, navigation }) {
   const [amount, setAmount] = useState(route.params?.initialAmount || '');
   const [note, setNote] = useState(route.params?.initialNote || '');
   const [category, setCategory] = useState(route.params?.initialCategory || 'food');
-  const [date, setDate] = useState(route.params?.initialDate || new Date().toISOString().slice(0, 10));
+  const getLocalDate = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  const [date, setDate] = useState(route.params?.initialDate || getLocalDate());
   const [isLoading, setIsLoading] = useState(false);
+  const isBill = route.params?.isBill || false;
   const { t } = useLanguageStore();
 
   const categories = [
@@ -32,12 +40,22 @@ export default function AddExpenseScreen({ route, navigation }) {
 
     setIsLoading(true);
     try {
-      await api.post('/expenses', {
-        amount: parseFloat(amount),
-        categoryId: category,          // backend expects camelCase
-        note: note || 'Expense',
-        date: date  // send extracted date or today
-      });
+      if (isBill) {
+        await api.post('/bills', {
+          title: note || 'Bill',
+          amount: parseFloat(amount),
+          category: category,
+          note: note || '',
+          date: date
+        });
+      } else {
+        await api.post('/expenses', {
+          amount: parseFloat(amount),
+          categoryId: category,
+          note: note || 'Expense',
+          date: date
+        });
+      }
       
       navigation.goBack();
     } catch (error) {
@@ -60,7 +78,7 @@ export default function AddExpenseScreen({ route, navigation }) {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
             <X color={colors.textPrimary} size={24} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('addExpense.title')}</Text>
+          <Text style={styles.headerTitle}>{isBill ? 'Add Personal Bill' : t('addExpense.title')}</Text>
           <View style={styles.iconBtn} />
         </View>
 

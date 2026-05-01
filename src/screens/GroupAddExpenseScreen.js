@@ -325,17 +325,21 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
       }
 
       if (isPersonal && b.selectedMembers.length === 1 && b.selectedMembers[0] === user?.id) {
+        const d = new Date();
+        const localDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         payloads.push({
           type: 'personal',
           payload: {
-            title: b.description, amount: parseFloat(b.price), categoryId: b.category, note: b.description, date: new Date().toISOString().slice(0, 10)
+            title: b.description, amount: parseFloat(b.price), categoryId: b.category, note: b.description, date: localDate
           }
         });
       } else {
+        const d = new Date();
+        const localDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         payloads.push({
           type: 'group',
           payload: {
-            title: b.description, amount: parseFloat(b.price), category: b.category, split_type: backendSplitType, note: b.description, paid_by: b.paidBy, members: membersPayload
+            title: b.description, amount: parseFloat(b.price), category: b.category, split_type: backendSplitType, note: b.description, paid_by: b.paidBy, members: membersPayload, date: localDate
           }
         });
       }
