@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Plus, Trash2, Target, CheckCircle2 } from 'lucide-react-native';
 import { api } from '../api/client';
 import { colors } from '../theme/colors';
+import { useLanguageStore } from '../store/languageStore';
 
 const { width } = Dimensions.get('window');
 
@@ -16,6 +17,7 @@ const ICONS = ['🎯', '🚗', '✈️', '🏠', '📱', '🎓', '💍', '💰']
 const COLORS = ['#5A67D8', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4'];
 
 export default function SavingsScreen({ navigation }) {
+  const { t } = useLanguageStore();
   const [goals, setGoals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -145,7 +147,7 @@ export default function SavingsScreen({ navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <ArrowLeft color="#1E2340" size={24} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Savings Goals</Text>
+        <Text style={styles.headerTitle}>{t('savings.title')}</Text>
         <TouchableOpacity style={styles.addBtn} onPress={() => setShowAddModal(true)}>
           <Plus color="#fff" size={20} />
         </TouchableOpacity>
@@ -153,7 +155,7 @@ export default function SavingsScreen({ navigation }) {
 
       {/* Overview Card */}
       <LinearGradient colors={['#10B981', '#059669']} style={styles.summaryCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-        <Text style={styles.summaryLabel}>Total Saved</Text>
+        <Text style={styles.summaryLabel}>{t('savings.total_saved')}</Text>
         <Text style={styles.summaryAmount}>₹{totalSaved.toFixed(0)}</Text>
         <View style={styles.progressContainer}>
           <View style={styles.progressBarBg}>
@@ -170,11 +172,11 @@ export default function SavingsScreen({ navigation }) {
           {goals.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>🎯</Text>
-              <Text style={styles.emptyTitle}>No Savings Goals</Text>
-              <Text style={styles.emptySubtitle}>Set a target for a new phone, emergency fund, or vacation and track your progress.</Text>
+              <Text style={styles.emptyTitle}>{t('savings.no_goals_title')}</Text>
+              <Text style={styles.emptySubtitle}>{t('savings.no_goals_sub')}</Text>
               <TouchableOpacity style={styles.emptyBtn} onPress={() => setShowAddModal(true)}>
                 <Plus color="#fff" size={18} />
-                <Text style={styles.emptyBtnText}>Create Goal</Text>
+                <Text style={styles.emptyBtnText}>{t('savings.create_goal')}</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -194,7 +196,7 @@ export default function SavingsScreen({ navigation }) {
                       <View>
                         <Text style={styles.cardName}>{goal.name}</Text>
                         <Text style={styles.cardMeta}>
-                          {isCompleted ? 'Goal Reached 🎉' : goal.target_date ? `Target: ${new Date(goal.target_date).toLocaleDateString('en-IN')}` : 'No deadline'}
+                          {isCompleted ? t('savings.goal_reached') : goal.target_date ? `Target: ${new Date(goal.target_date).toLocaleDateString('en-IN')}` : t('savings.no_deadline')}
                         </Text>
                       </View>
                     </View>
@@ -220,7 +222,7 @@ export default function SavingsScreen({ navigation }) {
                       onPress={() => { setSelectedGoal(goal); setShowFundModal(true); }}
                     >
                       <Plus color={goal.color} size={16} />
-                      <Text style={[styles.addFundsText, { color: goal.color }]}>Add Funds</Text>
+                      <Text style={[styles.addFundsText, { color: goal.color }]}>{t('savings.add_funds')}</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -237,15 +239,15 @@ export default function SavingsScreen({ navigation }) {
             <View style={styles.modalSheet}>
               <View style={styles.modalHandle} />
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                <Text style={styles.modalTitle}>New Savings Goal</Text>
+                <Text style={styles.modalTitle}>{t('savings.new_goal')}</Text>
 
-                <Text style={styles.fieldLabel}>Goal Name</Text>
+                <Text style={styles.fieldLabel}>{t('savings.goal_name')}</Text>
                 <TextInput style={styles.input} placeholder="e.g. New MacBook" placeholderTextColor="#A0AEC0" value={name} onChangeText={setName} />
 
-                <Text style={styles.fieldLabel}>Target Amount (₹)</Text>
+                <Text style={styles.fieldLabel}>{t('savings.target_amount')}</Text>
                 <TextInput style={styles.input} placeholder="0" placeholderTextColor="#A0AEC0" keyboardType="numeric" value={targetAmount} onChangeText={setTargetAmount} />
 
-                <Text style={styles.fieldLabel}>Target Date (Optional)</Text>
+                <Text style={styles.fieldLabel}>{t('savings.target_date')}</Text>
                 <TextInput style={styles.input} placeholder="DD/MM/YYYY" placeholderTextColor="#A0AEC0" keyboardType="numeric" maxLength={10} value={targetDate} onChangeText={setTargetDate} />
 
                 <Text style={styles.fieldLabel}>Icon</Text>
@@ -267,10 +269,10 @@ export default function SavingsScreen({ navigation }) {
                 </ScrollView>
 
                 <TouchableOpacity style={[styles.saveBtn, { backgroundColor: '#10B981' }]} onPress={handleAddGoal} disabled={saving}>
-                  {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Create Goal</Text>}
+                  {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{t('savings.create_goal')}</Text>}
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowAddModal(false)}>
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                  <Text style={styles.cancelBtnText}>{t('common.cancel')}</Text>
                 </TouchableOpacity>
               </ScrollView>
             </View>
@@ -283,9 +285,9 @@ export default function SavingsScreen({ navigation }) {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'center' }}>
           <View style={styles.centerModalOverlay}>
             <View style={styles.centerModalSheet}>
-              <Text style={styles.modalTitle}>Add Funds to {selectedGoal?.name}</Text>
+              <Text style={styles.modalTitle}>{t('savings.add_funds')} — {selectedGoal?.name}</Text>
               
-              <Text style={styles.fieldLabel}>Amount to Add (₹)</Text>
+              <Text style={styles.fieldLabel}>{t('savings.amount_to_add')}</Text>
               <TextInput 
                 style={styles.input} 
                 placeholder="0" 
@@ -298,10 +300,10 @@ export default function SavingsScreen({ navigation }) {
 
               <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
                 <TouchableOpacity style={[styles.cancelBtn, { flex: 1, backgroundColor: '#F1F5F9', borderRadius: 12 }]} onPress={() => setShowFundModal(false)}>
-                  <Text style={[styles.cancelBtnText, { color: '#475569' }]}>Cancel</Text>
+                  <Text style={[styles.cancelBtnText, { color: '#475569' }]}>{t('common.cancel')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.saveBtn, { flex: 1, marginBottom: 0, backgroundColor: selectedGoal?.color || '#10B981' }]} onPress={handleAddFunds} disabled={saving}>
-                  {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Add</Text>}
+                  {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{t('savings.add_funds')}</Text>}
                 </TouchableOpacity>
               </View>
             </View>

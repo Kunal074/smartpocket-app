@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Plus, Trash2, RefreshCw, Calendar, Pencil } from 'lucide-react-native';
 import { api } from '../api/client';
 import { colors } from '../theme/colors';
+import { useLanguageStore } from '../store/languageStore';
 
 const CATEGORY_META = {
   food:          { icon: '🍔', color: '#F59E0B' },
@@ -29,6 +30,7 @@ const FREQUENCIES = [
 const CATEGORIES = ['food', 'transport', 'shopping', 'bills', 'entertainment', 'other'];
 
 export default function RecurringScreen({ navigation }) {
+  const { t } = useLanguageStore();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -176,7 +178,7 @@ export default function RecurringScreen({ navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <ArrowLeft color="#1E2340" size={24} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Recurring</Text>
+        <Text style={styles.headerTitle}>{t('recurring.title')}</Text>
         <TouchableOpacity style={styles.addBtn} onPress={() => {
             setEditingItem(null);
             setNote(''); setAmount(''); setCategory('bills'); setFrequency('monthly'); setStartDate('');
@@ -188,7 +190,7 @@ export default function RecurringScreen({ navigation }) {
 
       {/* Summary Card */}
       <LinearGradient colors={['#5A67D8', '#7C3AED']} style={styles.summaryCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-        <Text style={styles.summaryLabel}>Monthly Recurring Spend</Text>
+        <Text style={styles.summaryLabel}>{t('recurring.total_monthly')}</Text>
         <Text style={styles.summaryAmount}>₹{totalMonthly.toFixed(0)}</Text>
         <Text style={styles.summarySubtitle}>{items.filter(i => i.is_active).length} active subscription{items.filter(i => i.is_active).length !== 1 ? 's' : ''}</Text>
       </LinearGradient>
@@ -201,11 +203,11 @@ export default function RecurringScreen({ navigation }) {
           {items.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>🔄</Text>
-              <Text style={styles.emptyTitle}>No Recurring Expenses</Text>
-              <Text style={styles.emptySubtitle}>Add subscriptions, rent, or bills that repeat automatically.</Text>
+              <Text style={styles.emptyTitle}>{t('recurring.title')}</Text>
+              <Text style={styles.emptySubtitle}>{t('recurring.no_recurring')}</Text>
               <TouchableOpacity style={styles.emptyBtn} onPress={() => setShowModal(true)}>
                 <Plus color="#fff" size={18} />
-                <Text style={styles.emptyBtnText}>Add First Recurring</Text>
+                <Text style={styles.emptyBtnText}>{t('recurring.add')}</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -269,9 +271,9 @@ export default function RecurringScreen({ navigation }) {
               <View style={styles.modalHandle} />
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
-              <Text style={styles.modalTitle}>{editingItem ? 'Edit Recurring' : 'Add Recurring Expense'}</Text>
+              <Text style={styles.modalTitle}>{editingItem ? t('common.edit') : t('recurring.new_recurring')}</Text>
 
-              <Text style={styles.fieldLabel}>Name / Description</Text>
+              <Text style={styles.fieldLabel}>{t('recurring.expense_name')}</Text>
             <TextInput
               style={styles.input}
               placeholder="e.g. Netflix, Gym, Rent"
@@ -280,7 +282,7 @@ export default function RecurringScreen({ navigation }) {
               onChangeText={setNote}
             />
 
-            <Text style={styles.fieldLabel}>Amount (₹)</Text>
+            <Text style={styles.fieldLabel}>{t('recurring.amount')}</Text>
             <TextInput
               style={styles.input}
               placeholder="0"
@@ -290,7 +292,7 @@ export default function RecurringScreen({ navigation }) {
               onChangeText={setAmount}
             />
 
-            <Text style={styles.fieldLabel}>Category</Text>
+            <Text style={styles.fieldLabel}>{t('recurring.category')}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
               {CATEGORIES.map(cat => {
                 const meta = CATEGORY_META[cat];
@@ -307,7 +309,7 @@ export default function RecurringScreen({ navigation }) {
               })}
             </ScrollView>
 
-            <Text style={styles.fieldLabel}>Frequency</Text>
+            <Text style={styles.fieldLabel}>{t('recurring.frequency')}</Text>
             <View style={styles.freqRow}>
               {FREQUENCIES.map(f => (
                 <TouchableOpacity
@@ -336,10 +338,10 @@ export default function RecurringScreen({ navigation }) {
             <Text style={{ fontSize: 11, color: '#A0AEC0', marginTop: 4, marginBottom: 16 }}>Format: DD/MM/YYYY — leave blank to start today</Text>
 
               <TouchableOpacity style={styles.saveBtn} onPress={handleAdd} disabled={saving}>
-                {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save Recurring</Text>}
+                {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{t('recurring.add')}</Text>}
               </TouchableOpacity>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowModal(false)}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
+                <Text style={styles.cancelBtnText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>

@@ -16,6 +16,7 @@ import { colors } from '../theme/colors';
 import ExpenseActionModal from '../components/ExpenseActionModal';
 import { api } from '../api/client';
 import { useAuth } from '../store/useAuth';
+import { useLanguageStore } from '../store/languageStore';
 
 const { width } = Dimensions.get('window');
 
@@ -26,6 +27,7 @@ const CATEGORY_ICONS = {
 
 export default function DashboardScreen({ navigation }) {
   const { user, logout } = useAuth();
+  const { t } = useLanguageStore();
   const [expenses, setExpenses] = useState([]);
   const [balanceData, setBalanceData] = useState(null);
   const [groups, setGroups] = useState([]);
@@ -366,7 +368,7 @@ export default function DashboardScreen({ navigation }) {
                 onPress={() => navigation.navigate('BudgetSetup')}
               >
                 <PieChart color="#fff" size={14} />
-                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>Set Budget</Text>
+                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{t('dashboard.set_budget')}</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
@@ -374,7 +376,7 @@ export default function DashboardScreen({ navigation }) {
                 onPress={() => navigation.navigate('Savings')}
               >
                 <Target color="#34D399" size={14} />
-                <Text style={{ color: '#34D399', fontSize: 12, fontWeight: '600' }}>Add Savings</Text>
+                <Text style={{ color: '#34D399', fontSize: 12, fontWeight: '600' }}>{t('dashboard.savings')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -487,21 +489,21 @@ export default function DashboardScreen({ navigation }) {
             <View style={[styles.quickBtnIcon, { backgroundColor: '#EEF2FF' }]}>
               <Plus color="#5A67D8" size={20} />
             </View>
-            <Text style={styles.quickBtnLabel}>Add Expense</Text>
+            <Text style={styles.quickBtnLabel}>{t('dashboard.add_expense')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.quickBtn} onPress={handleScanReceipt}>
             <View style={[styles.quickBtnIcon, { backgroundColor: '#ECFDF5' }]}>
               <Receipt color="#10B981" size={20} />
             </View>
-            <Text style={styles.quickBtnLabel}>Scan Bill</Text>
+            <Text style={styles.quickBtnLabel}>{t('dashboard.scan_bill')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('Recurring')}>
             <View style={[styles.quickBtnIcon, { backgroundColor: '#FFF7ED' }]}>
               <RefreshCw color="#F59E0B" size={20} />
             </View>
-            <Text style={styles.quickBtnLabel}>Recurring</Text>
+            <Text style={styles.quickBtnLabel}>{t('dashboard.recurring')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('CreateGroup')}>
@@ -571,7 +573,7 @@ export default function DashboardScreen({ navigation }) {
                 style={styles.seeAllBtn}
                 onPress={() => navigation.navigate('MainTabs', { screen: 'SmartSplit', params: { screen: 'Groups' } })}
               >
-                <Text style={styles.seeAllText}>See All</Text>
+                <Text style={styles.seeAllText}>{t('dashboard.see_all')}</Text>
                 <ChevronRight color="#5A67D8" size={14} />
               </TouchableOpacity>
             </View>
@@ -605,7 +607,7 @@ export default function DashboardScreen({ navigation }) {
         {/* ── Recent Transactions ───────────────────────── */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Expenses</Text>
+            <Text style={styles.sectionTitle}>{t('dashboard.recent_transactions')}</Text>
           </View>
           {recent.length === 0 ? (
             <View style={styles.emptyCard}>

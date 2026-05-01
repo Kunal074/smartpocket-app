@@ -12,6 +12,7 @@ import * as Print from 'expo-print';
 import { colors } from '../theme/colors';
 import { api } from '../api/client';
 import ExpenseActionModal from '../components/ExpenseActionModal';
+import { useLanguageStore } from '../store/languageStore';
 
 const { width } = Dimensions.get('window');
 
@@ -26,6 +27,7 @@ const CATEGORY_META = {
 };
 
 export default function AnalyticsScreen({ route }) {
+  const { t, language } = useLanguageStore();
   // If navigated from Dashboard with a filter
   const initialTimeframe = route?.params?.filter || 'month';
 
@@ -311,7 +313,7 @@ export default function AnalyticsScreen({ route }) {
       const monthStr = String(now.getMonth() + 1).padStart(2, '0');
       const yearStr = now.getFullYear().toString();
       
-      const res = await api.get(`/analytics/insights?month=${monthStr}&year=${yearStr}`);
+      const res = await api.get(`/analytics/insights?month=${monthStr}&year=${yearStr}&lang=${language}`);
       setInsightsText(res.data.insights || 'No insights available right now.');
     } catch (e) {
       console.warn('Failed to load insights', e);
@@ -331,20 +333,20 @@ export default function AnalyticsScreen({ route }) {
         {/* Header */}
         <View style={styles.header}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: 12 }}>
-            <Text style={styles.headerTitle}>Analytics</Text>
+            <Text style={styles.headerTitle}>{t('analytics.title')}</Text>
             <TouchableOpacity onPress={handleExport} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#EEF2FF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 }}>
               <Download color="#5A67D8" size={16} />
-              <Text style={{ color: '#5A67D8', fontSize: 13, fontWeight: '700' }}>Export</Text>
+              <Text style={{ color: '#5A67D8', fontSize: 13, fontWeight: '700' }}>{t('analytics.export')}</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.headerTabs}>
-            {['Personal', 'Groups'].map(t => (
+            {[t('analytics.personal'), t('analytics.groups')].map(tab => (
               <TouchableOpacity
-                key={t}
-                style={[styles.headerTab, activeTab === t && styles.headerTabActive]}
-                onPress={() => setActiveTab(t)}
+                key={tab}
+                style={[styles.headerTab, (tab === t('analytics.personal') ? activeTab === 'Personal' : activeTab === 'Groups') && styles.headerTabActive]}
+                onPress={() => setActiveTab(tab === t('analytics.personal') ? 'Personal' : 'Groups')}
               >
-                <Text style={[styles.headerTabText, activeTab === t && styles.headerTabTextActive]}>{t}</Text>
+                <Text style={[styles.headerTabText, (tab === t('analytics.personal') ? activeTab === 'Personal' : activeTab === 'Groups') && styles.headerTabTextActive]}>{tab}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -373,7 +375,7 @@ export default function AnalyticsScreen({ route }) {
               onPress={handleGetInsights}
             >
               <Text style={{ fontSize: 18 }}>✨</Text>
-              <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>Ask AI for Financial Insights</Text>
+              <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>{t('analytics.ask_ai')}</Text>
             </TouchableOpacity>
 
             {/* This Period vs Last Period */}
@@ -401,7 +403,7 @@ export default function AnalyticsScreen({ route }) {
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <BarChart2 color="#5A67D8" size={18} />
-                <Text style={styles.cardTitle}>Spending Trend</Text>
+                <Text style={styles.cardTitle}>{t('analytics.spending_trend')}</Text>
               </View>
               {trends.length === 0 ? (
                 <Text style={styles.emptyText}>No data yet</Text>
@@ -425,7 +427,7 @@ export default function AnalyticsScreen({ route }) {
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <PieChart color="#5A67D8" size={18} />
-                <Text style={styles.cardTitle}>By Category</Text>
+                <Text style={styles.cardTitle}>{t('analytics.by_category')}</Text>
               </View>
               {byCategory.length === 0 ? (
                 <Text style={styles.emptyText}>No expenses this {timeframe}</Text>

@@ -11,9 +11,11 @@ import {
 } from 'lucide-react-native';
 import { api } from '../api/client';
 import { useAuth } from '../store/useAuth';
+import { useLanguageStore } from '../store/languageStore';
 
 export default function SettingsScreen({ navigation }) {
   const { user, logout, setUser } = useAuth();
+  const { language, setLanguage, t } = useLanguageStore();
 
   // Profile edit state
   const [editing, setEditing] = useState(false);
@@ -69,6 +71,15 @@ export default function SettingsScreen({ navigation }) {
     );
   };
 
+  const handleLanguageChange = () => {
+    Alert.alert('App Language', 'Choose your preferred language:', [
+      { text: 'English', onPress: () => setLanguage('en') },
+      { text: 'Hindi (हिंदी)', onPress: () => setLanguage('hi') },
+      { text: 'Hinglish', onPress: () => setLanguage('hinglish') },
+      { text: 'Cancel', style: 'cancel' }
+    ]);
+  };
+
   const Section = ({ title, children }) => (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -100,7 +111,7 @@ export default function SettingsScreen({ navigation }) {
 
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Settings</Text>
+          <Text style={styles.headerTitle}>{t('profile.title')}</Text>
         </View>
 
         {/* Profile Card */}
@@ -195,6 +206,13 @@ export default function SettingsScreen({ navigation }) {
         {/* Preferences Section */}
         <Section title="Preferences">
           <Row
+            icon={<Text style={{ fontSize: 18 }}>🌐</Text>}
+            label={t('profile.language')}
+            value={language === 'en' ? 'English' : language === 'hi' ? 'Hindi' : 'Hinglish'}
+            onPress={handleLanguageChange}
+            noBorder={false}
+          />
+          <Row
             icon={<Bell color="#EC4899" size={18} />}
             label="Notifications"
             noBorder={false}
@@ -241,7 +259,7 @@ export default function SettingsScreen({ navigation }) {
         {/* Logout */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
           <LogOut color="#EF4444" size={20} />
-          <Text style={styles.logoutText}>Logout</Text>
+          <Text style={styles.logoutText}>{t('profile.logout')}</Text>
         </TouchableOpacity>
 
       </ScrollView>

@@ -6,6 +6,7 @@ import {
 import { X, Check } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { api } from '../api/client';
+import { useLanguageStore } from '../store/languageStore';
 
 export default function AddExpenseScreen({ route, navigation }) {
   const [amount, setAmount] = useState(route.params?.initialAmount || '');
@@ -13,13 +14,14 @@ export default function AddExpenseScreen({ route, navigation }) {
   const [category, setCategory] = useState(route.params?.initialCategory || 'food');
   const [date, setDate] = useState(route.params?.initialDate || new Date().toISOString().slice(0, 10));
   const [isLoading, setIsLoading] = useState(false);
+  const { t } = useLanguageStore();
 
   const categories = [
-    { id: 'food', icon: '🍔', label: 'Food' },
-    { id: 'transport', icon: '🚕', label: 'Transport' },
-    { id: 'shopping', icon: '🛍️', label: 'Shopping' },
-    { id: 'bills', icon: '📄', label: 'Bills' },
-    { id: 'entertainment', icon: '🎬', label: 'Fun' },
+    { id: 'food', icon: '🍔', label: t('addExpense.food') },
+    { id: 'transport', icon: '🚕', label: t('addExpense.transport') },
+    { id: 'shopping', icon: '🛍️', label: t('addExpense.shopping') },
+    { id: 'bills', icon: '📄', label: t('addExpense.bills') },
+    { id: 'entertainment', icon: '🎬', label: t('addExpense.fun') },
   ];
 
   const handleSave = async () => {
@@ -58,7 +60,7 @@ export default function AddExpenseScreen({ route, navigation }) {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
             <X color={colors.textPrimary} size={24} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Add Expense</Text>
+          <Text style={styles.headerTitle}>{t('addExpense.title')}</Text>
           <View style={styles.iconBtn} />
         </View>
 
@@ -78,7 +80,7 @@ export default function AddExpenseScreen({ route, navigation }) {
           </View>
 
           {/* Categories Grid */}
-          <Text style={styles.sectionLabel}>Category</Text>
+          <Text style={styles.sectionLabel}>{t('addExpense.category')}</Text>
           <View style={styles.categoryGrid}>
             {categories.map((cat) => {
               const isSelected = category === cat.id;
@@ -98,7 +100,7 @@ export default function AddExpenseScreen({ route, navigation }) {
           </View>
 
           {/* Note Input */}
-          <Text style={styles.sectionLabel}>Note</Text>
+          <Text style={styles.sectionLabel}>{t('addExpense.note')}</Text>
           <TextInput
             style={styles.noteInput}
             placeholder="What was this for?"
@@ -118,7 +120,7 @@ export default function AddExpenseScreen({ route, navigation }) {
             ) : (
               <>
                 <Check color={colors.surface} size={20} />
-                <Text style={styles.saveBtnText}>Save Expense</Text>
+                <Text style={styles.saveBtnText}>{t('addExpense.save')}</Text>
               </>
             )}
           </TouchableOpacity>
