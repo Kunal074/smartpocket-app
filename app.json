@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "smartpocket-app",
+    "name": "SmartPocket",
     "slug": "smartpocket-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,24 +10,34 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#5A67D8"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.kunalx07.smartpocketapp"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#5A67D8"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.kunalx07.smartpocketapp"
+      "package": "com.kunalx07.smartpocketapp",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-sharing"
-    ]
+      "expo-sharing",
+      "expo-image-picker"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "f08ca885-ecd9-4efb-9362-21ef28b2253c"
+      }
+    }
   }
 }
