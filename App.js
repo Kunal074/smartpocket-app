@@ -1,5 +1,5 @@
 import 'react-native-gesture-handler';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer as NavContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
@@ -25,6 +25,7 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import BudgetSetupScreen from './src/screens/BudgetSetupScreen';
 import RecurringScreen from './src/screens/RecurringScreen';
 import SavingsScreen from './src/screens/SavingsScreen';
+import OnboardingScreen from './src/screens/OnboardingScreen';
 import { colors } from './src/theme/colors';
 import { useAuth } from './src/store/useAuth';
 import React, { useEffect } from 'react';
@@ -138,21 +139,23 @@ function BottomTabs() {
 
 // ─── Root App ────────────────────────────────────────────────────────────────
 export default function App() {
-  const { token, initAuth, isLoading } = useAuth();
+  const { token, initAuth, isLoading, isFirstLaunch } = useAuth();
 
   useEffect(() => {
     initAuth();
   }, [initAuth]);
 
-  if (isLoading) {
+  if (isLoading || isFirstLaunch === null) {
     return null;
   }
 
   return (
-    <NavigationContainer>
+    <NavContainer>
       <StatusBar style="dark" backgroundColor="#F4F8FB" />
       <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
-        {token ? (
+        {isFirstLaunch ? (
+          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+        ) : token ? (
           <>
             <Stack.Screen name="MainTabs" component={BottomTabs} />
             <Stack.Screen name="BudgetSetup" component={BudgetSetupScreen} options={{ presentation: 'modal' }} />
@@ -175,6 +178,7 @@ export default function App() {
           </>
         )}
       </Stack.Navigator>
-    </NavigationContainer>
+    </NavContainer>
   );
 }
+

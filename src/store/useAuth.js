@@ -7,30 +7,46 @@ export const useAuth = create((set) => ({
   token: null,
   isLoading: true,
   error: null,
+  isFirstLaunch: null,
 
   setUser: (user) => set({ user }),
 
   // Initialize: check if we have a token saved
   initAuth: async () => {
     try {
-      const token = await AsyncStorage.getItem('auth_token');
+      const [token, onboardingFlag] = await Promise.all([
+        AsyncStorage.getItem('auth_token'),
+        AsyncStorage.getItem('has_completed_onboarding')
+      ]);
+      
+      const isFirst = onboardingFlag !== 'true';
+
       if (token) {
         // Fetch user profile
         try {
           // Set token first so api requests have it
           set({ token });
           const res = await api.get('/auth/me');
-          set({ user: res.data.user, isLoading: false });
+          set({ user: res.data.user, isLoading: false, isFirstLaunch: isFirst });
         } catch (err) {
           // If token is invalid
-          set({ token: null, user: null, isLoading: false });
+          set({ token: null, user: null, isLoading: false, isFirstLaunch: isFirst });
           await AsyncStorage.removeItem('auth_token');
         }
       } else {
-        set({ isLoading: false });
+        set({ isLoading: false, isFirstLaunch: isFirst });
       }
     } catch (e) {
-      set({ isLoading: false });
+      set({ isLoading: false, isFirstLaunch: true });
+    }
+  },
+
+  completeOnboarding: async () => {
+    try {
+      await AsyncStorage.setItem('has_completed_onboarding', 'true');
+      set({ isFirstLaunch: false });
+    } catch (e) {
+      console.error('Failed to set onboarding flag', e);
     }
   },
 

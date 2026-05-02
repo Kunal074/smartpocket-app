@@ -1,9 +1,8 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Replace with your computer's local IP address when testing on a physical phone
-// e.g. http://192.168.1.15:3000/api
-export const API_URL = 'http://192.168.29.229:3000/api'; 
+// Production backend on Vercel
+export const API_URL = 'https://smartpocket.vercel.app/api';
 
 export const api = axios.create({
   baseURL: API_URL,
