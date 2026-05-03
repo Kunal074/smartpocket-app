@@ -697,10 +697,23 @@ export default function DashboardScreen({ navigation }) {
               const isToday = expense.date?.slice(0, 10) === today;
               const expDate = new Date(expense.date);
               const icon = CATEGORY_ICONS[expense.categoryId] || '💸';
-              const isUdhaarMila = expense.categoryId === 'udhaar' && expense.note === 'Udhaar Mila';
-              const isUdhaarDiya = expense.categoryId === 'udhaar' && expense.note === 'Udhaar Diya';
-              const amountColor = isUdhaarMila ? '#10B981' : '#EF4444';
-              const amountPrefix = isUdhaarMila ? '+' : '−';
+              
+              let title = expense.note || expense.categoryId || 'Expense';
+              let isPositive = false; // default negative expense
+
+              if (expense.categoryId === 'udhaar') {
+                if (expense.paid_by === user?.id) {
+                  title = 'Udhaar Diya';
+                  isPositive = false;
+                } else {
+                  title = 'Udhaar Mila';
+                  isPositive = true;
+                }
+              }
+
+              const amountColor = isPositive ? '#10B981' : '#EF4444';
+              const amountPrefix = isPositive ? '+' : '−';
+              
               return (
                 <TouchableOpacity 
                   key={expense.id} 
@@ -713,7 +726,7 @@ export default function DashboardScreen({ navigation }) {
                   </View>
                   <View style={styles.txInfo}>
                     <Text style={styles.txTitle}>
-                      {expense.note || expense.categoryId || 'Expense'}
+                      {title}
                       {expense.with_user ? ` • ${expense.with_user}` : ''}
                     </Text>
                     <Text style={styles.txDate}>

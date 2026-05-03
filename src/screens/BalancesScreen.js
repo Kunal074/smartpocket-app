@@ -61,14 +61,29 @@ export default function BalancesScreen({ navigation }) {
     setSettling(true);
     try {
       const isOwed = settleModal.group.net > 0;
-      await api.post(`/groups/${settleModal.group.groupId}/settlements`, {
-        paid_by: isOwed ? settleModal.person.userId : user.id,
-        paid_to: isOwed ? user.id : settleModal.person.userId,
-        amount: parseFloat(settleAmount),
-      });
+      const isDirect = settleModal.group.groupId === 'direct';
+
+      if (isDirect) {
+        // Direct Udhaar settlement — use global /settlements API
+        await api.post('/settlements', {
+          group_id: null,
+          paid_by: isOwed ? settleModal.person.userId : user.id,
+          paid_to: isOwed ? user.id : settleModal.person.userId,
+          amount: parseFloat(settleAmount),
+        });
+      } else {
+        // Group settlement
+        await api.post(`/groups/${settleModal.group.groupId}/settlements`, {
+          paid_by: isOwed ? settleModal.person.userId : user.id,
+          paid_to: isOwed ? user.id : settleModal.person.userId,
+          amount: parseFloat(settleAmount),
+        });
+      }
+
       setSettleModal(null);
       fetchBalances();
-      Alert.alert('✅ Settled!', `Payment of \u20b9${settleAmount} recorded successfully.`);
+      fetchSettlements();
+      Alert.alert('✅ Settled!', `Payment of ₹${settleAmount} recorded successfully.`);
     } catch (e) {
       Alert.alert('Error', e.response?.data?.error || 'Failed to record settlement');
     } finally {
@@ -99,14 +114,12 @@ export default function BalancesScreen({ navigation }) {
 
   const handleSettlePress = (person) => {
     if (!person.groups || person.groups.length === 0) {
-       Alert.alert('No Group', 'No shared groups found to settle this balance.');
+       Alert.alert('No Balance', 'No groups or direct balance found.');
        return;
     }
     if (person.groups.length > 1) {
-       // Multi-group: go to detail screen to settle specific groups
        navigation.navigate('PersonBalanceDetail', { person });
     } else {
-       // Single group: settle directly
        setSettleAmount(Math.abs(person.groups[0].net).toFixed(0));
        setSettleModal({ person, group: person.groups[0] });
     }
