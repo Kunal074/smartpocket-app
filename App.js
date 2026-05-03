@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { Home, Users, PieChart, GitFork, Settings } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import DashboardScreen from './src/screens/DashboardScreen';
 import GroupsScreen from './src/screens/GroupsScreen';
@@ -35,6 +36,7 @@ const Stack = createNativeStackNavigator();
 
 // ─── SmartSplit nested tab navigator ────────────────────────────────────────
 function SmartSplitTabs() {
+  const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
       screenOptions={{
@@ -43,8 +45,8 @@ function SmartSplitTabs() {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: colors.borderLight,
-          height: 56,
-          paddingBottom: 8,
+          height: 56 + insets.bottom,
+          paddingBottom: 8 + insets.bottom,
           paddingTop: 8,
           elevation: 0,
           shadowOpacity: 0,
@@ -85,6 +87,7 @@ function SmartSplitTabs() {
 
 // ─── Main bottom tab navigator ───────────────────────────────────────────────
 function BottomTabs() {
+  const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
       screenOptions={{
@@ -93,8 +96,8 @@ function BottomTabs() {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: colors.borderLight,
-          height: 60,
-          paddingBottom: 8,
+          height: 60 + insets.bottom,
+          paddingBottom: 8 + insets.bottom,
           paddingTop: 8,
           elevation: 0,
           shadowOpacity: 0,
