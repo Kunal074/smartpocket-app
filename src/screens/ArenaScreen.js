@@ -31,8 +31,6 @@ export default function ArenaScreen({ navigation }) {
 
   // Join modal
   const [showJoinModal, setShowJoinModal] = useState(false);
-  const [targetInput, setTargetInput] = useState('');
-  const [goalName, setGoalName] = useState('');
   const [joining, setJoining] = useState(false);
   const [savingsGoals, setSavingsGoals] = useState([]);
   const [selectedGoalId, setSelectedGoalId] = useState(null);
@@ -64,47 +62,57 @@ export default function ArenaScreen({ navigation }) {
   useFocusEffect(useCallback(() => { fetchData(); }, [filter]));
 
   const openJoinModal = async () => {
-    setShowJoinModal(true);
     setLoadingGoals(true);
     setSelectedGoalId(null);
-    setTargetInput('');
-    setGoalName('');
     try {
       const res = await api.get('/savings');
       const goals = (res.data.goals || []).filter(g => !g.is_completed);
+      
+      if (goals.length === 0) {
+        Alert.alert(
+          'No Savings Goals',
+          'You need at least one active savings goal to join the Arena. Create one now!',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Create Goal', onPress: () => navigation.navigate('Savings') }
+          ]
+        );
+        return;
+      }
+      
       setSavingsGoals(goals);
+      setShowJoinModal(true);
     } catch (e) {
-      setSavingsGoals([]);
+      Alert.alert('Error', 'Could not load savings goals');
     } finally {
       setLoadingGoals(false);
     }
   };
 
   const handleJoin = async () => {
-    if (!targetInput || isNaN(targetInput) || parseFloat(targetInput) <= 0) {
-      Alert.alert('Invalid', 'Please enter a valid target amount');
+    if (!selectedGoalId) {
+      Alert.alert('Select Goal', 'Please select a savings goal to compete with.');
       return;
     }
+    
     setJoining(true);
     try {
-      const finalTarget = selectedGoalId
-        ? parseFloat(savingsGoals.find(g => g.id === selectedGoalId)?.target_amount)
-        : parseFloat(targetInput);
+      const selectedGoal = savingsGoals.find(g => g.id === selectedGoalId);
+      const finalTarget = parseFloat(selectedGoal?.target_amount);
+      const finalGoalName = selectedGoal?.name;
 
       if (!finalTarget || isNaN(finalTarget) || finalTarget <= 0) {
-        Alert.alert('Invalid', 'Please select a goal or enter a valid target amount');
+        Alert.alert('Invalid', 'Selected goal has an invalid target amount');
         setJoining(false);
         return;
       }
 
-      // If custom target, pass goal_name so backend auto-creates savings goal
       await api.post('/arena/join', {
         target_amount: finalTarget,
-        goal_name: selectedGoalId ? null : (goalName.trim() || null),
+        goal_name: finalGoalName,
       });
+      
       setShowJoinModal(false);
-      setTargetInput('');
-      setGoalName('');
       setSelectedGoalId(null);
       fetchData();
     } catch (e) {
@@ -184,6 +192,7 @@ export default function ArenaScreen({ navigation }) {
         </View>
         <View style={styles.lbInfo}>
           <Text style={styles.lbName}>{item.name}{isMe ? ' (You)' : ''}</Text>
+          {item.goal_name ? <Text style={[styles.lbSub, { fontWeight: '600', color: '#5A67D8' }]}>{item.goal_name}</Text> : null}
           <Text style={styles.lbSub}>{item.pct}% • ₹{parseFloat(item.saved_amount).toFixed(0)} saved</Text>
         </View>
         <View style={styles.lbRight}>
@@ -239,6 +248,11 @@ export default function ArenaScreen({ navigation }) {
                   <View>
                     <Text style={styles.myTierBadge}>{tierConfig.emoji} {tierConfig.label} Tier</Text>
                     <Text style={styles.myRankText}>Rank #{myRank || '—'}</Text>
+                    {myChallenge.goal_name ? (
+                      <Text style={{ color: '#fff', fontSize: 13, marginTop: 4, fontWeight: '700' }}>
+                        🎯 {myChallenge.goal_name}
+                      </Text>
+                    ) : null}
                   </View>
                   <View style={styles.myPoints}>
                     <Text style={styles.myPointsNum}>{myChallenge.points}</Text>
@@ -334,78 +348,58 @@ export default function ArenaScreen({ navigation }) {
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
             <Text style={styles.modalTitle}>Join This Month's Arena 🏆</Text>
-            <Text style={styles.modalSub}>Select a savings goal or enter a custom target.</Text>
+            <Text style={styles.modalSub}>Select a savings goal to compete with.</Text>
 
             {loadingGoals ? (
               <ActivityIndicator color="#5A67D8" style={{ marginVertical: 20 }} />
             ) : savingsGoals.length > 0 ? (
               <>
-                <Text style={styles.fieldLabel}>Your Savings Goals</Text>
-                <ScrollView style={{ maxHeight: 200, marginBottom: 16 }} showsVerticalScrollIndicator={false}>
+                <Text style={styles.fieldLabel}>Your Active Savings Goals</Text>
+                <ScrollView style={{ maxHeight: 250, marginBottom: 16 }} showsVerticalScrollIndicator={false}>
                   {savingsGoals.map(goal => {
                     const isSelected = selectedGoalId === goal.id;
-                    const tier = parseFloat(goal.target_amount) <= 5000 ? '🥉' :
-                                 parseFloat(goal.target_amount) <= 20000 ? '🥈' :
-                                 parseFloat(goal.target_amount) <= 100000 ? '🥇' : '💎';
+                    const tier = parseFloat(goal.target_amount) <= 5000 ? '🥉 Bronze' :
+                                 parseFloat(goal.target_amount) <= 20000 ? '🥈 Silver' :
+                                 parseFloat(goal.target_amount) <= 100000 ? '🥇 Gold' : '💎 Platinum';
                     return (
                       <TouchableOpacity
                         key={goal.id}
                         style={[styles.goalSelectCard, isSelected && styles.goalSelectCardActive]}
-                        onPress={() => { setSelectedGoalId(goal.id); setTargetInput(''); }}
+                        onPress={() => setSelectedGoalId(goal.id)}
                       >
                         <Text style={{ fontSize: 22 }}>{goal.icon || '🎯'}</Text>
                         <View style={{ flex: 1 }}>
                           <Text style={[styles.goalSelectName, isSelected && { color: '#5A67D8' }]}>{goal.name}</Text>
-                          <Text style={styles.goalSelectMeta}>Target: ₹{parseFloat(goal.target_amount).toFixed(0)} {tier}</Text>
+                          <Text style={styles.goalSelectMeta}>Target: ₹{parseFloat(goal.target_amount).toFixed(0)} • {tier}</Text>
                         </View>
                         {isSelected && <Text style={{ fontSize: 18 }}>✅</Text>}
                       </TouchableOpacity>
                     );
                   })}
                 </ScrollView>
-                <Text style={[styles.fieldLabel, { textAlign: 'center', marginBottom: 8 }]}>— OR ENTER CUSTOM —</Text>
               </>
             ) : null}
 
-            <TextInput
-              style={[styles.input, selectedGoalId && { opacity: 0.4 }]}
-              placeholder="Custom target amount (₹)"
-              placeholderTextColor="#A0AEC0"
-              keyboardType="numeric"
-              value={targetInput}
-              onChangeText={(v) => { setTargetInput(v); setSelectedGoalId(null); }}
-              editable={!selectedGoalId}
-            />
-
-            {/* Goal Name — only when typing custom target */}
-            {targetInput && !selectedGoalId ? (
-              <TextInput
-                style={styles.input}
-                placeholder="Goal name (e.g. iPhone 15, Bike)"
-                placeholderTextColor="#A0AEC0"
-                value={goalName}
-                onChangeText={setGoalName}
-              />
-            ) : null}
-
-            {(selectedGoalId || targetInput) ? (
+            {selectedGoalId ? (
               <View style={styles.tierPreview}>
                 <Text style={styles.tierPreviewText}>
                   {(() => {
-                    const amt = selectedGoalId
-                      ? parseFloat(savingsGoals.find(g => g.id === selectedGoalId)?.target_amount)
-                      : parseFloat(targetInput);
-                    return `You'll be in: ${
+                    const amt = parseFloat(savingsGoals.find(g => g.id === selectedGoalId)?.target_amount);
+                    return `You'll compete in the ${
                       amt <= 5000 ? '🥉 Bronze' :
                       amt <= 20000 ? '🥈 Silver' :
                       amt <= 100000 ? '🥇 Gold' : '💎 Platinum'
-                    } Tier`;
+                    } Tier!`;
                   })()}
                 </Text>
               </View>
             ) : null}
 
-            <TouchableOpacity style={styles.saveBtn} onPress={handleJoin} disabled={joining}>
+            <TouchableOpacity 
+              style={[styles.saveBtn, !selectedGoalId && { opacity: 0.5 }]} 
+              onPress={handleJoin} 
+              disabled={joining || !selectedGoalId}
+            >
               {joining ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Join Challenge 🚀</Text>}
             </TouchableOpacity>
             <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowJoinModal(false)}>

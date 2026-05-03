@@ -272,7 +272,7 @@ export default function SavingsScreen({ navigation }) {
 
       {/* Add Goal Modal */}
       <Modal visible={showAddModal} animationType="slide" transparent onRequestClose={() => setShowAddModal(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'flex-end' }}>
           <View style={styles.modalOverlay}>
             <View style={styles.modalSheet}>
               <View style={styles.modalHandle} />
@@ -320,7 +320,7 @@ export default function SavingsScreen({ navigation }) {
 
       {/* Add Funds Modal */}
       <Modal visible={showFundModal} animationType="fade" transparent onRequestClose={() => setShowFundModal(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'center' }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'center' }}>
           <View style={styles.centerModalOverlay}>
             <View style={styles.centerModalSheet}>
               <Text style={styles.modalTitle}>{t('savings.add_funds')} — {selectedGoal?.name}</Text>

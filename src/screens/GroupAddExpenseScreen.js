@@ -374,7 +374,7 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
+      <KeyboardAvoidingView behavior="padding" style={styles.container}>
         
         {/* Header */}
         <View style={styles.header}>
@@ -577,8 +577,9 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
           transparent={true}
           onRequestClose={() => setShowUnequalModal(false)}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
+          <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
               
               {/* Modal Drag Handle */}
               <View style={styles.modalHandle} />
@@ -660,6 +661,7 @@ export default function GroupAddExpenseScreen({ route, navigation }) {
 
             </View>
           </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         {/* Add Member Modal (Duplicated for convenience) */}
