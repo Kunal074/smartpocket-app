@@ -141,12 +141,54 @@ function BottomTabs() {
 }
 
 // ─── Root App ────────────────────────────────────────────────────────────────
+import { useShareIntent } from 'expo-share-intent';
+import { Alert } from 'react-native';
+import { api } from './src/api/client';
+
 export default function App() {
   const { token, initAuth, isLoading, isFirstLaunch } = useAuth();
+  const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
 
   useEffect(() => {
     initAuth();
   }, [initAuth]);
+
+  useEffect(() => {
+    // If user is logged in and we received a text share intent
+    if (token && hasShareIntent && shareIntent.value && shareIntent.type === 'text') {
+      const processSharedText = async () => {
+        try {
+          // You could show a local toast here
+          const res = await api.post('/expenses/text', { text: shareIntent.value });
+          if (res.data && !res.data.error && res.data.amount) {
+            
+            // Actually save the expense to the DB!
+            await api.post('/expenses', {
+              amount: parseFloat(res.data.amount),
+              categoryId: res.data.category || 'other',
+              note: res.data.note || 'Shared Expense',
+              date: res.data.date || new Date().toISOString().slice(0, 10)
+            });
+
+            Alert.alert(
+              'Expense Added via Share! 🎉',
+              `Added ₹${res.data.amount} for ${res.data.category}.\nNote: ${res.data.note}`
+            );
+          } else {
+            Alert.alert('Could not parse shared text', res.data?.error || 'AI failed to understand.');
+          }
+        } catch (e) {
+          Alert.alert('Error', 'Failed to process shared text.');
+        } finally {
+          resetShareIntent();
+        }
+      };
+      processSharedText();
+    } else if (hasShareIntent) {
+      // If it's not text or user not logged in, just clear it
+      resetShareIntent();
+    }
+  }, [hasShareIntent, shareIntent, token]);
 
   if (isLoading || isFirstLaunch === null) {
     return null;

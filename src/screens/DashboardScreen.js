@@ -12,6 +12,7 @@ import {
 } from 'lucide-react-native';
 import * as Contacts from 'expo-contacts';
 import * as ImagePicker from 'expo-image-picker';
+import { Audio } from 'expo-av';
 import { colors } from '../theme/colors';
 import ExpenseActionModal from '../components/ExpenseActionModal';
 import { api } from '../api/client';
@@ -191,25 +192,66 @@ export default function DashboardScreen({ navigation }) {
     handleAddFriendDirectly(phone);
   };
 
-  const handleAIParse = async () => {
-    if (!aiInput.trim()) return;
-    setIsAIParsing(true);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recording, setRecording] = useState(null);
+
+  const startRecording = async () => {
     try {
-      const res = await api.post('/expenses/voice', { text: aiInput.trim() });
+      const perm = await Audio.requestPermissionsAsync();
+      if (perm.status === 'granted') {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+        });
+        
+        const { recording } = await Audio.Recording.createAsync(
+          Audio.RecordingOptionsPresets.HIGH_QUALITY
+        );
+        setRecording(recording);
+        setIsRecording(true);
+      } else {
+        Alert.alert('Permission Denied', 'Please grant microphone access to use voice expenses.');
+      }
+    } catch (err) {
+      console.error('Failed to start recording', err);
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!recording) return;
+    setIsRecording(false);
+    setIsAIParsing(true);
+
+    try {
+      await recording.stopAndUnloadAsync();
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+      const uri = recording.getURI();
+      setRecording(null);
+      
+      const formData = new FormData();
+      formData.append('audio', {
+        uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
+        type: 'audio/m4a',
+        name: 'voice_expense.m4a',
+      });
+
+      const res = await api.post('/expenses/voice', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
       if (res.data && !res.data.error) {
         setShowAIModal(false);
-        setAiInput('');
         navigation.navigate('AddExpense', {
           initialAmount: res.data.amount?.toString() || '',
           initialCategory: res.data.category || 'other',
-          initialNote: res.data.note || 'AI Expense',
+          initialNote: res.data.note || 'Voice Expense',
           initialDate: res.data.date || new Date().toISOString().slice(0, 10),
         });
       } else {
-        Alert.alert('Parse Failed', res.data?.error || 'AI could not understand that.');
+        Alert.alert('Voice Failed', res.data?.error || 'AI could not understand that.');
       }
-    } catch (e) {
-      Alert.alert('Parse Failed', e.response?.data?.error || 'Could not process.');
+    } catch (err) {
+      Alert.alert('Voice Failed', err.response?.data?.error || 'Could not process audio.');
     } finally {
       setIsAIParsing(false);
     }
@@ -495,6 +537,13 @@ export default function DashboardScreen({ navigation }) {
             <Text style={styles.quickBtnLabel}>{t('dashboard.add_expense')}</Text>
           </TouchableOpacity>
 
+          <TouchableOpacity style={styles.quickBtn} onPress={() => setShowAIModal(true)}>
+            <View style={[styles.quickBtnIcon, { backgroundColor: '#F3E8FF' }]}>
+              <Mic color="#9333EA" size={20} />
+            </View>
+            <Text style={styles.quickBtnLabel}>Voice Add</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity style={styles.quickBtn} onPress={handleScanReceipt}>
             <View style={[styles.quickBtnIcon, { backgroundColor: '#ECFDF5' }]}>
               <Receipt color="#10B981" size={20} />
@@ -657,6 +706,54 @@ export default function DashboardScreen({ navigation }) {
 
         <View style={{ height: 30 }} />
       </ScrollView>
+
+      {/* ── Voice AI Modal ───────────────────────────── */}
+      {showAIModal && (
+        <KeyboardAvoidingView 
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Voice Expense</Text>
+              <TouchableOpacity onPress={() => setShowAIModal(false)}>
+                <Text style={styles.modalCancel}>Close</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+              {isAIParsing ? (
+                <>
+                  <ActivityIndicator size="large" color="#9333EA" />
+                  <Text style={{ marginTop: 20, color: colors.textSecondary, fontSize: 16 }}>AI is analyzing your voice...</Text>
+                </>
+              ) : (
+                <>
+                  <TouchableOpacity
+                    style={{
+                      width: 100, height: 100, borderRadius: 50,
+                      backgroundColor: isRecording ? '#F3E8FF' : '#EEF2FF',
+                      justifyContent: 'center', alignItems: 'center',
+                      borderWidth: isRecording ? 4 : 0,
+                      borderColor: '#9333EA',
+                    }}
+                    onPressIn={startRecording}
+                    onPressOut={stopRecording}
+                  >
+                    <Mic color={isRecording ? '#9333EA' : '#5A67D8'} size={40} />
+                  </TouchableOpacity>
+                  <Text style={{ marginTop: 24, fontSize: 16, fontWeight: '600', color: colors.textPrimary }}>
+                    {isRecording ? "Listening..." : "Hold to Speak"}
+                  </Text>
+                  <Text style={{ marginTop: 8, color: colors.textSecondary, textAlign: 'center', paddingHorizontal: 20 }}>
+                    e.g. "Bought coffee for 150 rupees" or "10 rs auto wale ko diya"
+                  </Text>
+                </>
+              )}
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      )}
 
       {/* ── Quick Udhaar Modal ───────────────────────── */}
       {showUdhaarModal && (

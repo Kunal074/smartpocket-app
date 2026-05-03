@@ -2,6 +2,7 @@
   "expo": {
     "name": "SmartPocket",
     "slug": "smartpocket-app",
+    "scheme": "smartpocket",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -32,7 +33,8 @@
     },
     "plugins": [
       "expo-sharing",
-      "expo-image-picker"
+      "expo-image-picker",
+      "expo-share-intent"
     ],
     "extra": {
       "eas": {

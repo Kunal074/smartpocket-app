@@ -234,7 +234,7 @@ export default function SavingsScreen({ navigation }) {
 
       {/* Add Goal Modal */}
       <Modal visible={showAddModal} animationType="slide" transparent onRequestClose={() => setShowAddModal(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
           <View style={styles.modalOverlay}>
             <View style={styles.modalSheet}>
               <View style={styles.modalHandle} />
@@ -251,7 +251,7 @@ export default function SavingsScreen({ navigation }) {
                 <TextInput style={styles.input} placeholder="DD/MM/YYYY" placeholderTextColor="#A0AEC0" keyboardType="numeric" maxLength={10} value={targetDate} onChangeText={setTargetDate} />
 
                 <Text style={styles.fieldLabel}>Icon</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ marginBottom: 16 }}>
                   {ICONS.map(i => (
                     <TouchableOpacity key={i} style={[styles.pickerItem, selectedIcon === i && styles.pickerItemActive]} onPress={() => setSelectedIcon(i)}>
                       <Text style={styles.pickerIcon}>{i}</Text>
@@ -260,7 +260,7 @@ export default function SavingsScreen({ navigation }) {
                 </ScrollView>
 
                 <Text style={styles.fieldLabel}>Color</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ marginBottom: 24 }}>
                   {COLORS.map(c => (
                     <TouchableOpacity key={c} style={[styles.colorItem, selectedColor === c && { borderColor: c, borderWidth: 2 }]} onPress={() => setSelectedColor(c)}>
                       <View style={[styles.colorCircle, { backgroundColor: c }]} />
@@ -282,7 +282,7 @@ export default function SavingsScreen({ navigation }) {
 
       {/* Add Funds Modal */}
       <Modal visible={showFundModal} animationType="fade" transparent onRequestClose={() => setShowFundModal(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'center' }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'center' }}>
           <View style={styles.centerModalOverlay}>
             <View style={styles.centerModalSheet}>
               <Text style={styles.modalTitle}>{t('savings.add_funds')} — {selectedGoal?.name}</Text>
