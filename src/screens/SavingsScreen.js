@@ -7,6 +7,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Plus, Trash2, Target, CheckCircle2 } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { api } from '../api/client';
 import { colors } from '../theme/colors';
 import { useLanguageStore } from '../store/languageStore';
@@ -87,6 +88,26 @@ export default function SavingsScreen({ navigation }) {
     }
   };
 
+  const handleCelebrate = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { Alert.alert('Permission needed', 'Please allow photo access'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.6,
+      base64: true,
+    });
+    if (!result.canceled && result.assets[0].base64) {
+      try {
+        await api.post('/arena/celebrate', { imageBase64: `data:image/jpeg;base64,${result.assets[0].base64}` });
+        Alert.alert('🎊 Posted!', 'Your achievement photo is live on the Arena leaderboard!');
+      } catch (e) {
+        Alert.alert('Error', 'Could not upload photo. Try again from Arena screen.');
+      }
+    }
+  };
+
   const handleAddFunds = async () => {
     if (!fundAmount || isNaN(fundAmount) || parseFloat(fundAmount) <= 0) {
       Alert.alert('Error', 'Please enter a valid amount to add');
@@ -97,7 +118,7 @@ export default function SavingsScreen({ navigation }) {
       const newTotal = parseFloat(selectedGoal.saved_amount) + parseFloat(fundAmount);
       const isCompleted = newTotal >= parseFloat(selectedGoal.target_amount);
 
-      await api.patch(`/savings/${selectedGoal.id}`, {
+      const res = await api.patch(`/savings/${selectedGoal.id}`, {
         saved_amount: newTotal,
         is_completed: isCompleted,
       });
@@ -106,9 +127,26 @@ export default function SavingsScreen({ navigation }) {
       setFundAmount('');
       setSelectedGoal(null);
       fetchGoals();
-      
+
       if (isCompleted) {
-        Alert.alert('🎉 Goal Reached!', `Congratulations! You've reached your goal for ${selectedGoal.name}.`);
+        // Check if Arena was also just completed
+        if (res.data?.arena_just_completed) {
+          Alert.alert(
+            '🎉 Goal + Arena Achieved!',
+            `You saved ₹${newTotal.toFixed(0)} and hit your Arena target! 🏆\n\nShare a photo when you buy it!`,
+            [
+              { text: 'Maybe later', style: 'cancel' },
+              { text: '📸 Share to Arena!', onPress: handleCelebrate },
+            ]
+          );
+        } else {
+          Alert.alert('🎉 Goal Reached!', `You've saved ₹${newTotal.toFixed(0)} for ${selectedGoal.name}!`,
+            [
+              { text: 'Done', style: 'cancel' },
+              { text: '📸 Share to Arena!', onPress: handleCelebrate },
+            ]
+          );
+        }
       }
     } catch (e) {
       Alert.alert('Error', 'Failed to add funds.');

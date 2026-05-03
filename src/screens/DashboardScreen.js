@@ -528,6 +528,29 @@ export default function DashboardScreen({ navigation }) {
           </LinearGradient>
         </TouchableOpacity>
 
+        {/* ── Arena Teaser Card ─────────────────────────── */}
+        <TouchableOpacity
+          style={{ marginHorizontal: 20, marginBottom: 16, borderRadius: 20, overflow: 'hidden' }}
+          onPress={() => navigation.navigate('Arena')}
+          activeOpacity={0.85}
+        >
+          <LinearGradient
+            colors={['#1E2340', '#3D1F6B']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{ flexDirection: 'row', alignItems: 'center', padding: 16, gap: 14 }}
+          >
+            <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' }}>
+              <Text style={{ fontSize: 24 }}>🏆</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }}>Savings Arena</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 }}>Compete monthly · Tier-based ranking</Text>
+            </View>
+            <ArrowRight color="#fff" size={20} />
+          </LinearGradient>
+        </TouchableOpacity>
+
         {/* ── Quick Actions ────────────────────────────── */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 16 }} style={{ marginBottom: 24 }}>
           <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('AddExpense')}>
