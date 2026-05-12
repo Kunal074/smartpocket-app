@@ -66,11 +66,25 @@ export default function PersonBalanceDetailScreen({ route, navigation }) {
     setSettling(true);
     try {
       const isOwed = settleModal.net > 0;
-      await api.post(`/groups/${settleModal.groupId}/settlements`, {
-        paid_by: isOwed ? person.userId : user.id,
-        paid_to: isOwed ? user.id : person.userId,
-        amount: parseFloat(settleAmount),
-      });
+      const isDirect = settleModal.groupId === 'direct';
+
+      if (isDirect) {
+        // Direct Udhaar settlement — use global /settlements API
+        await api.post('/settlements', {
+          group_id: null,
+          paid_by: isOwed ? person.userId : user.id,
+          paid_to: isOwed ? user.id : person.userId,
+          amount: parseFloat(settleAmount),
+        });
+      } else {
+        // Group settlement
+        await api.post(`/groups/${settleModal.groupId}/settlements`, {
+          paid_by: isOwed ? person.userId : user.id,
+          paid_to: isOwed ? user.id : person.userId,
+          amount: parseFloat(settleAmount),
+        });
+      }
+
       setSettleModal(null);
       if (activeTab === 'Settlements') fetchSettlements();
       Alert.alert('✅ Settled!', `Payment of \u20b9${settleAmount} recorded successfully.`);
