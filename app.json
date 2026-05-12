@@ -27,6 +27,28 @@
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.RECORD_AUDIO"
+      ],
+      "intentFilters": [
+        {
+          "action": "SEND",
+          "data": [
+            { "mimeType": "image/*" },
+            { "mimeType": "application/pdf" }
+          ],
+          "category": [
+            "DEFAULT"
+          ]
+        },
+        {
+          "action": "SEND_MULTIPLE",
+          "data": [
+            { "mimeType": "image/*" },
+            { "mimeType": "application/pdf" }
+          ],
+          "category": [
+            "DEFAULT"
+          ]
+        }
       ]
     },
     "web": {
