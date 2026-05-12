@@ -39,24 +39,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "f08ca885-ecd9-4efb-9362-21ef28b2253c",
-        "build": {
-          "experimental": {
-            "ios": {
-              "appExtensions": [
-                {
-                  "targetName": "ShareExtension",
-                  "bundleIdentifier": "com.kunalx07.smartpocketapp.share-extension",
-                  "entitlements": {
-                    "com.apple.security.application-groups": [
-                      "group.com.kunalx07.smartpocketapp"
-                    ]
-                  }
-                }
-              ]
-            }
-          }
-        }
+        "projectId": "f08ca885-ecd9-4efb-9362-21ef28b2253c"
       }
     },
     "runtimeVersion": {

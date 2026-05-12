@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, StyleSheet, SafeAreaView, Platform,
-  ScrollView, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator, Linking
+  ScrollView, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator, Linking, KeyboardAvoidingView
 } from 'react-native';
 import { ChevronLeft, Globe, Users, Home, Heart, User } from 'lucide-react-native';
 import { colors } from '../theme/colors';
@@ -10,7 +10,8 @@ import { api } from '../api/client';
 import { useAuth } from '../store/useAuth';
 
 export default function PersonBalanceDetailScreen({ route, navigation }) {
-  const { person } = route.params;
+  const { person: initialPerson } = route.params;
+  const [person, setPerson] = useState(initialPerson);
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('Expenses'); // Expenses | Settlements
   const [activeSubTab, setActiveSubTab] = useState('Groups'); // Direct | Groups
@@ -87,7 +88,24 @@ export default function PersonBalanceDetailScreen({ route, navigation }) {
 
       setSettleModal(null);
       if (activeTab === 'Settlements') fetchSettlements();
-      Alert.alert('✅ Settled!', `Payment of \u20b9${settleAmount} recorded successfully.`);
+      
+      // Update the person balance in UI
+      try {
+        const balRes = await api.get('/balances');
+        const updated = balRes.data.byPerson?.find(p => p.userId === person.userId);
+        if (updated) {
+          setPerson(updated);
+        } else {
+          // If no balance left, zero it out locally
+          setPerson({ 
+            ...person, 
+            net: 0, 
+            groups: person.groups.map(g => g.groupId === settleModal.groupId ? { ...g, net: 0 } : g) 
+          });
+        }
+      } catch(e) {}
+
+      Alert.alert('✅ Settled!', `Payment of ₹${settleAmount} recorded successfully.`);
     } catch (e) {
       Alert.alert('Error', e.response?.data?.error || 'Failed to record settlement');
     } finally {
@@ -281,50 +299,52 @@ export default function PersonBalanceDetailScreen({ route, navigation }) {
 
       {/* Settle Up Modal */}
       <Modal visible={!!settleModal} transparent animationType="slide" onRequestClose={() => setSettleModal(null)}>
-        <TouchableOpacity style={styles.settleModalBackdrop} activeOpacity={1} onPress={() => setSettleModal(null)} />
-        <View style={styles.settleModalSheet}>
-          <View style={styles.settleModalPill} />
-          <Text style={styles.settleModalTitle}>Record Settlement</Text>
-          <Text style={styles.settleModalSub}>
-            {settleModal?.net > 0 ? `${person.name} → Aap` : `Aap → ${person.name}`}
-          </Text>
-          <View style={styles.settleModalAmountRow}>
-            <Text style={styles.settleModalCurrency}>₹</Text>
-            <TextInput
-              style={styles.settleModalInput}
-              keyboardType="numeric"
-              value={settleAmount}
-              onChangeText={setSettleAmount}
-              placeholder="0"
-              placeholderTextColor="#A0AEC0"
-            />
-          </View>
-          
-          <View style={{ flexDirection: 'row', gap: 12, width: '100%', marginBottom: 16 }}>
-            <TouchableOpacity
-              style={[styles.settleModalBtn, { flex: 1, backgroundColor: '#EDF2F7' }, settling && { opacity: 0.7 }]}
-              onPress={confirmSettle}
-              disabled={settling}
-            >
-              {settling
-                ? <ActivityIndicator color="#5A67D8" />
-                : <Text style={[styles.settleModalBtnText, { color: '#4A5568' }]}>Already Paid</Text>
-              }
-            </TouchableOpacity>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}>
+          <TouchableOpacity style={styles.settleModalBackdrop} activeOpacity={1} onPress={() => setSettleModal(null)} />
+          <View style={styles.settleModalSheet}>
+            <View style={styles.settleModalPill} />
+            <Text style={styles.settleModalTitle}>Record Settlement</Text>
+            <Text style={styles.settleModalSub}>
+              {settleModal?.net > 0 ? `${person.name} → Aap` : `Aap → ${person.name}`}
+            </Text>
+            <View style={styles.settleModalAmountRow}>
+              <Text style={styles.settleModalCurrency}>₹</Text>
+              <TextInput
+                style={styles.settleModalInput}
+                keyboardType="numeric"
+                value={settleAmount}
+                onChangeText={setSettleAmount}
+                placeholder="0"
+                placeholderTextColor="#A0AEC0"
+              />
+            </View>
+            
+            <View style={{ flexDirection: 'row', gap: 12, width: '100%', marginBottom: 16 }}>
+              <TouchableOpacity
+                style={[styles.settleModalBtn, { flex: 1, backgroundColor: '#EDF2F7' }, settling && { opacity: 0.7 }]}
+                onPress={confirmSettle}
+                disabled={settling}
+              >
+                {settling
+                  ? <ActivityIndicator color="#5A67D8" />
+                  : <Text style={[styles.settleModalBtnText, { color: '#4A5568' }]}>Already Paid</Text>
+                }
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.settleModalBtn, { flex: 1, backgroundColor: '#10B981' }, (settleModal?.net > 0) && { opacity: 0.5 }]}
-              onPress={handleUPIPayment}
-              disabled={settleModal?.net > 0} // Can't pay them if they owe you
-            >
-              <Text style={styles.settleModalBtnText}>Pay via UPI</Text>
+              <TouchableOpacity
+                style={[styles.settleModalBtn, { flex: 1, backgroundColor: '#10B981' }, (settleModal?.net > 0) && { opacity: 0.5 }]}
+                onPress={handleUPIPayment}
+                disabled={settleModal?.net > 0} // Can't pay them if they owe you
+              >
+                <Text style={styles.settleModalBtnText}>Pay via UPI</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity style={styles.settleModalCancel} onPress={() => setSettleModal(null)}>
+              <Text style={styles.settleModalCancelText}>Cancel</Text>
             </TouchableOpacity>
           </View>
-
-          <TouchableOpacity style={styles.settleModalCancel} onPress={() => setSettleModal(null)}>
-            <Text style={styles.settleModalCancelText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
