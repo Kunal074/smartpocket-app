@@ -55,7 +55,6 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-sharing",
       "expo-image-picker",
       "expo-share-intent"
     ],
