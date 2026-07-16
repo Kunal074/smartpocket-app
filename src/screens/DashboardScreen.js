@@ -43,6 +43,7 @@ export default function DashboardScreen({ navigation }) {
   const [showUdhaarModal, setShowUdhaarModal] = useState(false);
   const [udhaarFriendId, setUdhaarFriendId] = useState(null);
   const [udhaarAmount, setUdhaarAmount] = useState('');
+  const [udhaarNote, setUdhaarNote] = useState('');
   const [udhaarType, setUdhaarType] = useState('gave'); // 'gave' | 'got'
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -116,18 +117,20 @@ export default function DashboardScreen({ navigation }) {
 
     setIsSubmitting(true);
     try {
+      const defaultTitle = udhaarType === 'gave' ? 'Udhaar Diya' : 'Udhaar Mila';
       const payload = {
-        title: udhaarType === 'gave' ? 'Udhaar Diya' : 'Udhaar Mila',
+        title: udhaarNote.trim() || defaultTitle,
         amount: parseFloat(udhaarAmount),
         split_type: 'custom',
         category: 'udhaar',
-        note: 'Quick Udhaar',
+        note: udhaarNote.trim() || 'Quick Udhaar',
         paid_by: udhaarType === 'gave' ? user.id : udhaarFriendId,
         members: [{ user_id: udhaarType === 'gave' ? udhaarFriendId : user.id, amount: parseFloat(udhaarAmount) }]
       };
       await api.post('/expenses/direct', payload);
       setShowUdhaarModal(false);
       setUdhaarAmount('');
+      setUdhaarNote('');
       setUdhaarFriendId(null);
       // Soft reload
       const balRes = await api.get('/balances');
@@ -870,6 +873,18 @@ export default function DashboardScreen({ navigation }) {
                 keyboardType="numeric"
                 value={udhaarAmount}
                 onChangeText={setUdhaarAmount}
+              />
+            </View>
+
+            <Text style={[styles.modalLabel, { marginTop: 16 }]}>Comment (optional)</Text>
+            <View style={[styles.modalInputContainer, { paddingVertical: 12 }]}>
+              <TextInput
+                style={[styles.modalInput, { fontSize: 15 }]}
+                placeholder="e.g. Petrol ke paise, Lunch split..."
+                placeholderTextColor={colors.textMuted}
+                value={udhaarNote}
+                onChangeText={setUdhaarNote}
+                maxLength={100}
               />
             </View>
 
