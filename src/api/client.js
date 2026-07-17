@@ -2,10 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Production backend on Vercel
-// export const API_URL = 'https://smartpocket.vercel.app/api';
-
-// Local development — same WiFi
-export const API_URL = 'http://192.168.29.218:3000/api';
+export const API_URL = 'https://smartpocket.vercel.app/api';
 
 export const api = axios.create({
   baseURL: API_URL,
