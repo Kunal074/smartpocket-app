@@ -1,5 +1,5 @@
 import 'react-native-gesture-handler';
-import { NavigationContainer as NavContainer } from '@react-navigation/native';
+import { NavigationContainer as NavContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
@@ -34,6 +34,7 @@ import React, { useEffect } from 'react';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+const navigationRef = createNavigationContainerRef();
 
 // ─── SmartSplit nested tab navigator ────────────────────────────────────────
 function SmartSplitTabs() {
@@ -143,16 +144,45 @@ function BottomTabs() {
 
 // ─── Root App ────────────────────────────────────────────────────────────────
 import { useShareIntent } from 'expo-share-intent';
-import { Alert } from 'react-native';
+import { Alert, Vibration } from 'react-native';
 import { api } from './src/api/client';
+import { Accelerometer } from 'expo-sensors';
 
 export default function App() {
-  const { token, initAuth, isLoading, isFirstLaunch } = useAuth();
+  const { token, initAuth, isLoading, isFirstLaunch, shakeToAdd } = useAuth();
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
 
   useEffect(() => {
     initAuth();
   }, [initAuth]);
+
+  useEffect(() => {
+    let subscription = null;
+    let lastShake = 0;
+
+    if (token && shakeToAdd) {
+      Accelerometer.setUpdateInterval(100);
+      subscription = Accelerometer.addListener(({ x, y, z }) => {
+        const acceleration = Math.sqrt(x * x + y * y + z * z);
+        const now = Date.now();
+
+        // 2.2G magnitude detection & 2 seconds debounce cooldown
+        if (acceleration > 2.2 && now - lastShake > 2000) {
+          lastShake = now;
+          Vibration.vibrate(200);
+          if (navigationRef.isReady()) {
+            navigationRef.navigate('AddExpense');
+          }
+        }
+      });
+    }
+
+    return () => {
+      if (subscription) {
+        subscription.remove();
+      }
+    };
+  }, [token, shakeToAdd]);
 
   useEffect(() => {
     // If user is logged in and we received a text share intent
@@ -196,7 +226,7 @@ export default function App() {
   }
 
   return (
-    <NavContainer>
+    <NavContainer ref={navigationRef}>
       <StatusBar style="dark" backgroundColor="#F4F8FB" />
       <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
         {isFirstLaunch ? (

@@ -14,7 +14,7 @@ import { useAuth } from '../store/useAuth';
 import { useLanguageStore } from '../store/languageStore';
 
 export default function SettingsScreen({ navigation }) {
-  const { user, logout, setUser } = useAuth();
+  const { user, logout, setUser, shakeToAdd, setShakeToAdd } = useAuth();
   const { language, setLanguage, t } = useLanguageStore();
 
   // Profile edit state
@@ -228,12 +228,25 @@ export default function SettingsScreen({ navigation }) {
           <Row
             icon={<Moon color="#6B7280" size={18} />}
             label="Dark Mode"
-            noBorder
+            noBorder={false}
             rightEl={
               <Switch
                 value={darkMode}
                 onValueChange={setDarkMode}
                 trackColor={{ false: '#E2E8F0', true: '#1E2340' }}
+                thumbColor="#fff"
+              />
+            }
+          />
+          <Row
+            icon={<Text style={{ fontSize: 18 }}>📳</Text>}
+            label="Shake to Add Expense"
+            noBorder
+            rightEl={
+              <Switch
+                value={shakeToAdd}
+                onValueChange={setShakeToAdd}
+                trackColor={{ false: '#E2E8F0', true: '#5A67D8' }}
                 thumbColor="#fff"
               />
             }

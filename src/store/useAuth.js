@@ -8,24 +8,36 @@ export const useAuth = create((set) => ({
   isLoading: true,
   error: null,
   isFirstLaunch: null,
+  shakeToAdd: true, // Default to true
 
   setUser: (user) => set({ user }),
+  
+  setShakeToAdd: async (value) => {
+    try {
+      await AsyncStorage.setItem('shake_to_add', value ? 'true' : 'false');
+      set({ shakeToAdd: value });
+    } catch (e) {
+      console.warn('Failed to save shake_to_add preference', e);
+    }
+  },
 
   // Initialize: check if we have a token saved
   initAuth: async () => {
     try {
-      const [token, onboardingFlag] = await Promise.all([
+      const [token, onboardingFlag, shakeFlag] = await Promise.all([
         AsyncStorage.getItem('auth_token'),
-        AsyncStorage.getItem('has_completed_onboarding')
+        AsyncStorage.getItem('has_completed_onboarding'),
+        AsyncStorage.getItem('shake_to_add')
       ]);
       
       const isFirst = onboardingFlag !== 'true';
+      const isShakeEnabled = shakeFlag !== 'false'; // defaults to true
 
       if (token) {
         // Fetch user profile
         try {
           // Set token first so api requests have it
-          set({ token });
+          set({ token, shakeToAdd: isShakeEnabled });
           const res = await api.get('/auth/me');
           set({ user: res.data.user, isLoading: false, isFirstLaunch: isFirst });
         } catch (err) {
@@ -34,7 +46,7 @@ export const useAuth = create((set) => ({
           await AsyncStorage.removeItem('auth_token');
         }
       } else {
-        set({ isLoading: false, isFirstLaunch: isFirst });
+        set({ token: null, user: null, isLoading: false, isFirstLaunch: isFirst, shakeToAdd: isShakeEnabled });
       }
     } catch (e) {
       set({ isLoading: false, isFirstLaunch: true });
